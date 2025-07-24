@@ -197,17 +197,39 @@ export const submitAttendanceRating = createAsyncThunk(
 
 export const submitBoyWage = createAsyncThunk(
   'subAdminAuth/submitBoyWage',
-  async (wageData, { getState, rejectWithValue }) => {
+  async (wageData, { getState, rejectWithValue, dispatch }) => {
     try {
       const { subAdminAuth } = getState();
-      const response = await axios.patch(`${API_BASE_URL}/sub_admin/boy-wage/edit/`, wageData, {
+      
+      // First submit the wage data
+      const wageResponse = await axios.patch(`${API_BASE_URL}/sub_admin/boy-wage/edit/`, {
+        user: wageData.user,
+        work: wageData.work,
+        travel_allowance: wageData.travel_allowance,
+        over_time: wageData.over_time,
+        long_fare: wageData.long_fare,
+        bonus: wageData.bonus,
+        payment_status: wageData.payment_status,
+      }, {
         headers: {
           'Authorization': `Bearer ${subAdminAuth.tokens?.access}`,
           'Content-Type': 'application/json',
         },
       });
       
-      return response.data;
+      // Then submit each expense if they exist
+      if (wageData.expenses && wageData.expenses.length > 0) {
+        for (const expense of wageData.expenses) {
+          await dispatch(addExtraExpense({
+            catering_work: wageData.work,
+            expense_type: expense.expense_type,
+            amount: expense.amount,
+            description: expense.description
+          }));
+        }
+      }
+      
+      return wageResponse.data;
     } catch (error) {
       if (error.response?.status === 401) {
         return rejectWithValue('Session expired. Please login again.');
@@ -260,6 +282,31 @@ export const updateBoyRating = createAsyncThunk(
         return rejectWithValue('Session expired. Please login again.');
       }
       return rejectWithValue(error.response?.data?.message || 'Failed to update boy rating');
+    }
+  }
+);
+
+
+
+// Add this after the other async thunks
+export const addExtraExpense = createAsyncThunk(
+  'subAdminAuth/addExtraExpense',
+  async (expenseData, { getState, rejectWithValue }) => {
+    try {
+      const { subAdminAuth } = getState();
+      const response = await axios.post(`${API_BASE_URL}/sub_admin/extra-expenses/`, expenseData, {
+        headers: {
+          'Authorization': `Bearer ${subAdminAuth.tokens?.access}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 401) {
+        return rejectWithValue('Session expired. Please login again.');
+      }
+      return rejectWithValue(error.response?.data?.message || 'Failed to add extra expense');
     }
   }
 );
@@ -325,6 +372,11 @@ updateRating: {
   error: null,
   success: false,
 },
+ extraExpenses: {
+    isLoading: false,
+    error: null,
+    success: false,
+  },
 cateringWorkList: {
     upcoming: {
       data: [],
@@ -413,6 +465,11 @@ const subAdminAuthSlice = createSlice({
     clearCateringWorkError: (state) => {
       state.cateringWorkList.error = null;
     },
+    // Add this to your reducers object
+clearExtraExpenseState: (state) => {
+  state.extraExpenses.error = null;
+  state.extraExpenses.success = false;
+},
     clearAssignedUsersError: (state) => {
       state.assignedUsers.error = null;
     },
@@ -430,6 +487,19 @@ const subAdminAuthSlice = createSlice({
       state.showAttendanceModal = action.payload;
     },
     clearBoyWageState: (state) => {
+  state.boyWage.error = null;
+  state.boyWage.success = false;
+},
+clearBoyRatingState: (state) => {
+  state.boyRating.error = null;
+  state.boyRating.success = false;
+  state.boyRating.data = null;
+},
+clearUpdateRatingState: (state) => {
+  state.updateRating.error = null;
+  state.updateRating.success = false;
+},
+clearBoyWageState: (state) => {
   state.boyWage.error = null;
   state.boyWage.success = false;
 },
@@ -610,6 +680,67 @@ clearUpdateRatingState: (state) => {
         state.boyWage.error = action.payload;
         state.boyWage.success = false;
       })
+      .addCase(addExtraExpense.pending, (state) => {
+        state.extraExpenses.isLoading = true;
+        state.extraExpenses.error = null;
+        state.extraExpenses.success = false;
+      })
+      .addCase(addExtraExpense.fulfilled, (state) => {
+        state.extraExpenses.isLoading = false;
+        state.extraExpenses.success = true;
+      })
+      .addCase(addExtraExpense.rejected, (state, action) => {
+        state.extraExpenses.isLoading = false;
+        state.extraExpenses.error = action.payload;
+        if (action.payload === 'Session expired. Please login again.') {
+          state.admin = null;
+          state.tokens = null;
+          state.isLoggedIn = false;
+          localStorage.removeItem('subAdminToken');
+          localStorage.removeItem('subAdminUser');
+        }
+      })
+      // Add these cases after the addExtraExpense cases and before the closing of builder
+.addCase(getBoyRating.pending, (state) => {
+  state.boyRating.isLoading = true;
+  state.boyRating.error = null;
+})
+.addCase(getBoyRating.fulfilled, (state, action) => {
+  state.boyRating.isLoading = false;
+  state.boyRating.data = action.payload;
+  state.boyRating.success = true;
+})
+.addCase(getBoyRating.rejected, (state, action) => {
+  state.boyRating.isLoading = false;
+  state.boyRating.error = action.payload;
+  if (action.payload === 'Session expired. Please login again.') {
+    state.admin = null;
+    state.tokens = null;
+    state.isLoggedIn = false;
+    localStorage.removeItem('subAdminToken');
+    localStorage.removeItem('subAdminUser');
+  }
+})
+.addCase(updateBoyRating.pending, (state) => {
+  state.updateRating.isLoading = true;
+  state.updateRating.error = null;
+  state.updateRating.success = false;
+})
+.addCase(updateBoyRating.fulfilled, (state, action) => {
+  state.updateRating.isLoading = false;
+  state.updateRating.success = true;
+})
+.addCase(updateBoyRating.rejected, (state, action) => {
+  state.updateRating.isLoading = false;
+  state.updateRating.error = action.payload;
+  if (action.payload === 'Session expired. Please login again.') {
+    state.admin = null;
+    state.tokens = null;
+    state.isLoggedIn = false;
+    localStorage.removeItem('subAdminToken');
+    localStorage.removeItem('subAdminUser');
+  }
+})
   },
 });
 
@@ -625,7 +756,11 @@ export const {
   clearAttendanceRatingState,
   setSelectedWork,
   clearSelectedWork,
-  toggleAttendanceModal
+  toggleAttendanceModal,
+  clearExtraExpenseState,
+  clearBoyWageState,
+  clearBoyRatingState,
+  clearUpdateRatingState
 } = subAdminAuthSlice.actions;
 
 

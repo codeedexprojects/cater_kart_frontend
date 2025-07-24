@@ -5,7 +5,7 @@ import { Search, Filter, Calendar, MapPin, User, Phone, Eye, AlertCircle, Refres
 
 const CateringWorks = () => {
   const dispatch = useDispatch();
-  const { cateringWorkList, assignedUsers, attendanceRating, boyWage } = useSelector((state) => state.subAdminAuth);
+  const { cateringWorkList, assignedUsers, attendanceRating, boyWage, boyRating } = useSelector((state) => state.subAdminAuth);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -20,8 +20,13 @@ const CateringWorks = () => {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [selectedUserForRating, setSelectedUserForRating] = useState(null);
   const [editingRatingId, setEditingRatingId] = useState(null);
-const [isEditMode, setIsEditMode] = useState(false);
-const { boyRating, updateRating } = useSelector((state) => state.subAdminAuth);
+  const [showWageModal, setShowWageModal] = useState(false);
+  const [selectedUserForWage, setSelectedUserForWage] = useState(null);
+  const [isWageEditMode, setIsWageEditMode] = useState(false);
+  const [editingWageId, setEditingWageId] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // REMOVED DUPLICATE boyRating DECLARATION AND FIXED ratingData STATE
   const [ratingData, setRatingData] = useState({
     pant: null,
     shoe: null,
@@ -43,9 +48,10 @@ useEffect(() => {
   dispatch(getCateringWorkList('past'));
 }, [dispatch]);
 
-  const handleRefresh = () => {
-    dispatch(getCateringWorkList());
-  };
+const handleRefresh = () => {
+  dispatch(getCateringWorkList('upcoming'));
+  dispatch(getCateringWorkList('past'));
+};
 
 const currentWorkList = activeTab === 'upcoming' 
   ? (cateringWorkList.upcoming?.data || []) 
@@ -172,6 +178,406 @@ useEffect(() => {
 
 const isLoading = cateringWorkList.upcoming?.isLoading || cateringWorkList.past?.isLoading;
 const hasError = cateringWorkList.upcoming?.error || cateringWorkList.past?.error;
+
+// Updated RatingModal component
+const RatingModal = ({ 
+  user, 
+  work, 
+  onClose, 
+  onSubmit,
+  initialData = {},
+  isEditMode = false 
+}) => {
+  const [ratingData, setRatingData] = useState({
+    pant: initialData.pant || null,
+    shoe: initialData.shoe || null,
+    timing: initialData.timing || null,
+    neatness: initialData.neatness || null,
+    performance: initialData.performance || null,
+    comment: initialData.comment || '',
+    arrival_time: initialData.arrival_time || '',
+    attendence: initialData.attendence || 1
+  });
+
+  const handleSubmit = () => {
+    const submitData = {
+      user: user.user_id,
+      work: work.id,
+      pant: ratingData.pant,
+      shoe: ratingData.shoe,
+      timing: ratingData.timing,
+      neatness: ratingData.neatness,
+      performance: ratingData.performance,
+      comment: ratingData.comment,
+      arrival_time: ratingData.arrival_time,
+      attendence: ratingData.attendence
+    };
+    onSubmit(submitData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50">
+      <div className="bg-white rounded-t-2xl w-full max-h-[90vh] overflow-y-auto animate-slide-up">
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">
+              {isEditMode ? 'Edit Rating for' : 'Rate'} {user.user_name}
+            </h3>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 p-2"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+        
+        <div className="p-4 space-y-6 pb-40">
+          {/* Boolean Rating Components */}
+          {['pant', 'shoe', 'timing', 'neatness', 'performance'].map((category) => (
+            <div key={category}>
+              <label className="block text-base font-medium text-gray-700 mb-3 capitalize">
+                {category}
+              </label>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setRatingData(prev => ({...prev, [category]: true}))}
+                  className={`flex-1 py-3 px-4 rounded-lg border font-medium flex items-center justify-center ${
+                    ratingData[category] === true
+                      ? 'bg-green-50 border-green-200 text-green-700'
+                      : 'bg-gray-50 border-gray-200 text-gray-700'
+                  }`}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Good
+                </button>
+                <button
+                  onClick={() => setRatingData(prev => ({...prev, [category]: false}))}
+                  className={`flex-1 py-3 px-4 rounded-lg border font-medium flex items-center justify-center ${
+                    ratingData[category] === false
+                      ? 'bg-red-50 border-red-200 text-red-700'
+                      : 'bg-gray-50 border-gray-200 text-gray-700'
+                  }`}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Poor
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {/* Arrival Time */}
+          <div>
+            <label className="block text-base font-medium text-gray-700 mb-3">Arrival Time</label>
+            <input
+              type="time"
+              value={ratingData.arrival_time}
+              onChange={(e) => setRatingData(prev => ({...prev, arrival_time: e.target.value}))}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Comment */}
+          <div>
+            <label className="block text-base font-medium text-gray-700 mb-3">Comment</label>
+            <textarea
+              value={ratingData.comment}
+              onChange={(e) => setRatingData(prev => ({...prev, comment: e.target.value}))}
+              rows={3}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              placeholder="Add your comments..."
+            />
+          </div>
+
+          {/* Attendance Toggle */}
+          <div>
+            <label className="block text-base font-medium text-gray-700 mb-3">Attendance</label>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setRatingData(prev => ({...prev, attendence: 1}))}
+                className={`flex-1 py-3 px-4 rounded-lg border font-medium ${
+                  ratingData.attendence === 1
+                    ? 'bg-green-50 border-green-200 text-green-700'
+                    : 'bg-gray-50 border-gray-200 text-gray-700'
+                }`}
+              >
+                Present
+              </button>
+              <button
+                onClick={() => setRatingData(prev => ({...prev, attendence: 0}))}
+                className={`flex-1 py-3 px-4 rounded-lg border font-medium ${
+                  ratingData.attendence === 0
+                    ? 'bg-red-50 border-red-200 text-red-700'
+                    : 'bg-gray-50 border-gray-200 text-gray-700'
+                }`}
+              >
+                Absent
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 space-y-3">
+          <button
+            onClick={handleSubmit}
+            className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-base"
+          >
+            {isEditMode ? 'Update Rating' : 'Submit Rating'}
+          </button>
+          
+          <button
+            onClick={onClose}
+            className="w-full bg-gray-100 text-gray-700 py-4 px-4 rounded-xl font-medium hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-base"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// New WageFormModal component
+const WageFormModal = ({ 
+  user, 
+  work, 
+  onClose, 
+  onSubmit,
+  initialData = {},
+  isEditMode = false 
+}) => {
+  const [wageData, setWageData] = useState({
+    travel_allowance: initialData.travel_allowance || '',
+    over_time: initialData.over_time || '',
+    long_fare: initialData.long_fare || '',
+    bonus: initialData.bonus || '',
+    payment_status: initialData.payment_status || 'not_paid',
+    expenses: initialData.expenses || []
+  });
+  
+  const [newExpense, setNewExpense] = useState({
+    expense_type: '',
+    amount: '',
+    description: ''
+  });
+
+  const handleAddExpense = () => {
+    if (newExpense.expense_type && newExpense.amount) {
+      setWageData(prev => ({
+        ...prev,
+        expenses: [...prev.expenses, {
+          expense_type: newExpense.expense_type,
+          amount: parseFloat(newExpense.amount),
+          description: newExpense.description
+        }]
+      }));
+      setNewExpense({
+        expense_type: '',
+        amount: '',
+        description: ''
+      });
+    }
+  };
+
+  const handleRemoveExpense = (index) => {
+    setWageData(prev => ({
+      ...prev,
+      expenses: prev.expenses.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleSubmit = () => {
+    const submitData = {
+      user: user.user_id,
+      work: work.id,
+      travel_allowance: wageData.travel_allowance ? parseFloat(wageData.travel_allowance) : 0,
+      over_time: wageData.over_time ? parseFloat(wageData.over_time) : 0,
+      long_fare: wageData.long_fare ? parseFloat(wageData.long_fare) : 0,
+      bonus: wageData.bonus ? parseFloat(wageData.bonus) : 0,
+      payment_status: wageData.payment_status,
+      expenses: wageData.expenses
+    };
+    onSubmit(submitData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50">
+      <div className="bg-white rounded-t-2xl w-full max-h-[90vh] overflow-y-auto animate-slide-up">
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">
+              {isEditMode ? 'Edit Wage for' : 'Add Wage for'} {user.user_name}
+            </h3>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 p-2"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+        
+        <div className="p-4 space-y-6 pb-40">
+          {/* Wage Section */}
+          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+            <h4 className="text-lg font-semibold text-blue-900 mb-4">Wage Details</h4>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Travel Allowance</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={wageData.travel_allowance}
+                  onChange={(e) => setWageData(prev => ({...prev, travel_allowance: e.target.value}))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Over Time</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={wageData.over_time}
+                  onChange={(e) => setWageData(prev => ({...prev, over_time: e.target.value}))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Long Fare</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={wageData.long_fare}
+                  onChange={(e) => setWageData(prev => ({...prev, long_fare: e.target.value}))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Bonus</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={wageData.bonus}
+                  onChange={(e) => setWageData(prev => ({...prev, bonus: e.target.value}))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Payment Status</label>
+                <select
+                  value={wageData.payment_status}
+                  onChange={(e) => setWageData(prev => ({...prev, payment_status: e.target.value}))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="paid">Paid</option>
+                  <option value="not_paid">Not Paid</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Extra Expenses Section */}
+          <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+            <h4 className="text-lg font-semibold text-green-900 mb-4">Extra Expenses</h4>
+            
+            {/* Expense List */}
+            {wageData.expenses.length > 0 && (
+              <div className="mb-4 space-y-2">
+                {wageData.expenses.map((expense, index) => (
+                  <div key={index} className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200">
+                    <div>
+                      <p className="font-medium">{expense.expense_type}</p>
+                      <p className="text-sm text-gray-600">{expense.description || 'No description'}</p>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="font-bold mr-3">₹{expense.amount}</span>
+                      <button 
+                        onClick={() => handleRemoveExpense(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add New Expense Form */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Expense Type</label>
+                <input
+                  type="text"
+                  value={newExpense.expense_type}
+                  onChange={(e) => setNewExpense(prev => ({...prev, expense_type: e.target.value}))}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="e.g., Food For boys"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                  <input
+                    type="number"
+                    value={newExpense.amount}
+                    onChange={(e) => setNewExpense(prev => ({...prev, amount: e.target.value}))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <input
+                    type="text"
+                    value={newExpense.description}
+                    onChange={(e) => setNewExpense(prev => ({...prev, description: e.target.value}))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleAddExpense}
+                className="w-full bg-green-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 text-sm"
+              >
+                Add Expense
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 space-y-3">
+          <button
+            onClick={handleSubmit}
+            className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-base"
+          >
+            {isEditMode ? 'Update Wage' : 'Submit Wage'}
+          </button>
+          
+          <button
+            onClick={onClose}
+            className="w-full bg-gray-100 text-gray-700 py-4 px-4 rounded-xl font-medium hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-base"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -434,16 +840,26 @@ const hasError = cateringWorkList.upcoming?.error || cateringWorkList.past?.erro
                     <div>
                       <p className="text-sm font-medium text-gray-900">{user.user_name}</p>
                       <p className="text-xs text-gray-500">{user.email}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${user.type === 'supervisor' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}`}>
+                          {user.type}
+                        </span>
+                        {user.is_rated && (
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                            Rated
+                          </span>
+                        )}
+                        {user.wage_id && (
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                            Wage Added
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${user.type === 'supervisor' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}`}>
-                      {user.type}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {formatDate(user.assigned_at)}
-                    </span>
-                  </div>
+                  <span className="text-xs text-gray-500">
+                    {formatDate(user.assigned_at)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -500,586 +916,144 @@ const hasError = cateringWorkList.upcoming?.error || cateringWorkList.past?.erro
       
       <div className="p-4 space-y-4">
         {assignedUsers.isLoading ? (
-          <div className="text-center py-8">
-            <RefreshCw className="h-5 w-5 animate-spin mx-auto text-blue-500" />
-            <p className="text-sm text-gray-600 mt-2">Loading assigned users...</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {(assignedUsers.data[selectedWorkForUsers.id] || []).map((user) => (
-              <div key={user.id} className="bg-gray-50 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full mr-3">
-                      <User className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-base font-medium text-gray-900">{user.user_name}</p>
-                      <p className="text-sm text-gray-500">{user.payment_status}</p>
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1 ${
+        <div className="text-center py-8">
+          <RefreshCw className="h-5 w-5 animate-spin mx-auto text-blue-500" />
+          <p className="text-sm text-gray-600 mt-2">Loading assigned users...</p>
+        </div>
+      ) : !assignedUsers.data[selectedWorkForUsers.id] || assignedUsers.data[selectedWorkForUsers.id].length === 0 ? (
+        <div className="text-center py-8 text-gray-500">
+          <p>No users assigned to this work.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {assignedUsers.data[selectedWorkForUsers.id].map((user) => (
+            <div key={user.id} className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center">
+                  <div className="flex items-center justify-center w-10 h-10 bg-blue-100 rounded-full mr-3">
+                    <User className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-base font-medium text-gray-900">{user.user_name}</p>
+                    <p className="text-sm text-gray-500">{user.email}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         user.type === 'supervisor' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
                       }`}>
                         {user.type}
                       </span>
+                      {user.is_rated && (
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                          ✓ Rated
+                        </span>
+                      )}
+                      {user.wage_id && (
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                          ✓ Wage Added
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    {/* Rate Button */}
-                    <button
-                      onClick={() => {
-                        setSelectedUserForRating(user);
-                        setShowRatingModal(true);
-                        setIsEditMode(false);
-                        setEditingRatingId(null);
-                        setRatingData({
-                          pant: null,
-                          shoe: null,
-                          timing: null,
-                          neatness: null,
-                          performance: null,
-                          comment: '',
-                          arrival_time: '',
-                          attendence: 1,
-                          travel_allowance: '',
-                          over_time: '',
-                          long_fare: '',
-                          bonus: '',
-                          payment_status: 'not_paid'
-                        });
-                      }}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
-                    >
-                      Rate
-                    </button>
-                    
-                    {/* Edit Rating Button - Show if rating exists */}
-                    {user.is_rated && (
-                      <button
-                        onClick={() => {
-                          setSelectedUserForRating(user);
-                          setIsEditMode(true);
-                          setEditingRatingId(user.is_rated);
-                          setShowRatingModal(true);
-                          // Fetch existing rating data
-                          dispatch(getBoyRating(user.is_rated));
-                        }}
-                        className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-700"
-                      >
-                        Edit
-                      </button>
-                    )}
-                  </div>
                 </div>
-                
-                {/* Show rating status if exists */}
-                {user.is_rated && (
-                  <div className="mt-2 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-                    ✓ Rating submitted
-                  </div>
-                )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-)}
-
-
-
-{/* Rating Modal with Stars */}
-{/* Updated Rating Modal with Boolean Stars and Wage Section */}
-{showRatingModal && selectedUserForRating && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50">
-    <div className="bg-white rounded-t-2xl w-full max-h-[90vh] overflow-y-auto animate-slide-up">
-      <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">
-            {isEditMode ? 'Edit Rating for' : 'Rate'} {selectedUserForRating.user_name}
-          </h3>
-          <button
-            onClick={() => {
-              setShowRatingModal(false);
-              setSelectedUserForRating(null);
-              setIsEditMode(false);
-              setEditingRatingId(null);
-            }}
-            className="text-gray-400 hover:text-gray-600 p-2"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
-      </div>
-      
-      <div className="p-4 space-y-6 pb-40">
-        {/* Loading existing rating data */}
-        {isEditMode && boyRating.isLoading && (
-          <div className="text-center py-8">
-            <RefreshCw className="h-5 w-5 animate-spin mx-auto text-blue-500" />
-            <p className="text-sm text-gray-600 mt-2">Loading existing rating...</p>
-          </div>
-        )}
-
-        {/* Boolean Rating Components */}
-        {['pant', 'shoe', 'timing', 'neatness', 'performance'].map((category) => (
-          <div key={category}>
-            <label className="block text-base font-medium text-gray-700 mb-3 capitalize">
-              {category}
-            </label>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setRatingData(prev => ({...prev, [category]: true}))}
-                className={`flex-1 py-3 px-4 rounded-lg border font-medium flex items-center justify-center ${
-                  ratingData[category] === true
-                    ? 'bg-green-50 border-green-200 text-green-700'
-                    : 'bg-gray-50 border-gray-200 text-gray-700'
-                }`}
-              >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Good
-              </button>
-              <button
-                onClick={() => setRatingData(prev => ({...prev, [category]: false}))}
-                className={`flex-1 py-3 px-4 rounded-lg border font-medium flex items-center justify-center ${
-                  ratingData[category] === false
-                    ? 'bg-red-50 border-red-200 text-red-700'
-                    : 'bg-gray-50 border-gray-200 text-gray-700'
-                }`}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Poor
-              </button>
-            </div>
-          </div>
-        ))}
-
-        {/* Arrival Time */}
-        <div>
-          <label className="block text-base font-medium text-gray-700 mb-3">Arrival Time</label>
-          <input
-            type="time"
-            value={ratingData.arrival_time}
-            onChange={(e) => setRatingData(prev => ({...prev, arrival_time: e.target.value}))}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-
-        {/* Comment */}
-        <div>
-          <label className="block text-base font-medium text-gray-700 mb-3">Comment</label>
-          <textarea
-            value={ratingData.comment}
-            onChange={(e) => setRatingData(prev => ({...prev, comment: e.target.value}))}
-            rows={3}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            placeholder="Add your comments..."
-          />
-        </div>
-
-        {/* Attendance Toggle */}
-        <div>
-          <label className="block text-base font-medium text-gray-700 mb-3">Attendance</label>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setRatingData(prev => ({...prev, attendence: 1}))}
-              className={`flex-1 py-3 px-4 rounded-lg border font-medium ${
-                ratingData.attendence === 1
-                  ? 'bg-green-50 border-green-200 text-green-700'
-                  : 'bg-gray-50 border-gray-200 text-gray-700'
-              }`}
-            >
-              Present
-            </button>
-            <button
-              onClick={() => setRatingData(prev => ({...prev, attendence: 0}))}
-              className={`flex-1 py-3 px-4 rounded-lg border font-medium ${
-                ratingData.attendence === 0
-                  ? 'bg-red-50 border-red-200 text-red-700'
-                  : 'bg-gray-50 border-gray-200 text-gray-700'
-              }`}
-            >
-              Absent
-            </button>
-          </div>
-        </div>
-
-        {/* Wage Section */}
-        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-          <h4 className="text-lg font-semibold text-blue-900 mb-4">Wage Details</h4>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Travel Allowance</label>
-              <input
-                type="number"
-                step="0.01"
-                value={ratingData.travel_allowance || ''}
-                onChange={(e) => setRatingData(prev => ({...prev, travel_allowance: e.target.value}))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="0.00"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Over Time</label>
-              <input
-                type="number"
-                step="0.01"
-                value={ratingData.over_time || ''}
-                onChange={(e) => setRatingData(prev => ({...prev, over_time: e.target.value}))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="0.00"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Long Fare</label>
-              <input
-                type="number"
-                step="0.01"
-                value={ratingData.long_fare || ''}
-                onChange={(e) => setRatingData(prev => ({...prev, long_fare: e.target.value}))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="0.00"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Bonus</label>
-              <input
-                type="number"
-                step="0.01"
-                value={ratingData.bonus || ''}
-                onChange={(e) => setRatingData(prev => ({...prev, bonus: e.target.value}))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="0.00"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Payment Status</label>
-              <select
-                value={ratingData.payment_status || 'not_paid'}
-                onChange={(e) => setRatingData(prev => ({...prev, payment_status: e.target.value}))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="paid">Paid</option>
-                <option value="not_paid">Not Paid</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 space-y-3">
-        <button
-          onClick={() => {
-            if (isEditMode && editingRatingId) {
-              // Update existing rating
-              const updateData = {
-                user: selectedUserForRating.user_id,
-                work: selectedWorkForUsers.id,
-                pant: ratingData.pant,
-                shoe: ratingData.shoe,
-                timing: ratingData.timing,
-                neatness: ratingData.neatness,
-                performance: ratingData.performance,
-                comment: ratingData.comment,
-                arrival_time: ratingData.arrival_time,
-                attendence: ratingData.attendence,
-                travel_allowance: ratingData.travel_allowance ? parseFloat(ratingData.travel_allowance) : 0,
-                over_time: ratingData.over_time ? parseFloat(ratingData.over_time) : 0,
-                long_fare: ratingData.long_fare ? parseFloat(ratingData.long_fare) : 0,
-                bonus: ratingData.bonus ? parseFloat(ratingData.bonus) : 0,
-                payment_status: ratingData.payment_status || 'not_paid'
-              };
               
-              dispatch(updateBoyRating({ ratingId: editingRatingId, ratingData: updateData }));
-            } else {
-              // Create new rating
-              const submitData = {
-                user: selectedUserForRating.user_id,
-                work: selectedWorkForUsers.id,
-                pant: ratingData.pant,
-                shoe: ratingData.shoe,
-                timing: ratingData.timing,
-                neatness: ratingData.neatness,
-                performance: ratingData.performance,
-                comment: ratingData.comment,
-                arrival_time: ratingData.arrival_time,
-                attendence: ratingData.attendence
-              };
-              console.log(selectedUserForRating)
-              console.log(selectedWorkForUsers)
-              console.log(submitData)
-              dispatch(submitAttendanceRating(submitData));
-
-              // Submit wage data separately
-              const wageData = {
-                user: selectedUserForRating.user_id,
-                work: selectedWorkForUsers.id,
-                travel_allowance: ratingData.travel_allowance ? parseFloat(ratingData.travel_allowance) : 0,
-                over_time: ratingData.over_time ? parseFloat(ratingData.over_time) : 0,
-                long_fare: ratingData.long_fare ? parseFloat(ratingData.long_fare) : 0,
-                bonus: ratingData.bonus ? parseFloat(ratingData.bonus) : 0,
-                payment_status: ratingData.payment_status || 'not_paid'
-              };
-              dispatch(submitBoyWage(wageData));
-            }
-
-            setShowRatingModal(false);
-            setSelectedUserForRating(null);
-            setShowAssignedUsersModal(false);
-            setSelectedWorkForUsers(null);
-            setIsEditMode(false);
-            setEditingRatingId(null);
-          }}
-          disabled={attendanceRating.isLoading || boyWage.isLoading || updateRating.isLoading}
-          className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-base"
-        >
-          {(attendanceRating.isLoading || boyWage.isLoading || updateRating.isLoading) ? (
-            <>
-              <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-              {isEditMode ? 'Updating...' : 'Submitting...'}
-            </>
-          ) : (
-            isEditMode ? 'Update Rating & Wage' : 'Submit Rating & Wage'
-          )}
-        </button>
-        
-        <button
-          onClick={() => {
-            setShowRatingModal(false);
-            setSelectedUserForRating(null);
-            setIsEditMode(false);
-            setEditingRatingId(null);
-          }}
-          className="w-full bg-gray-100 text-gray-700 py-4 px-4 rounded-xl font-medium hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-base"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-
-
-      {/* Detail Modal */}
-      {showModal && selectedWork && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50">
-          <div className="bg-white rounded-t-2xl w-full max-h-[90vh] overflow-y-auto animate-slide-up">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Work Details</h3>
+              <div className="flex gap-2">
+                {/* Rate Button */}
                 <button
-                  onClick={closeModal}
-                  className="text-gray-400 hover:text-gray-600 p-2"
+                  onClick={() => {
+                    setSelectedUserForRating(user);
+                    setShowRatingModal(true);
+                    setIsEditMode(!!user.is_rated);
+                    setEditingRatingId(user.is_rated || null);
+                    if (user.is_rated) {
+                      dispatch(getBoyRating(user.is_rated));
+                    }
+                  }}
+                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
                 >
-                  <X className="h-6 w-6" />
+                  {user.is_rated ? 'Edit Rating' : 'Rate User'}
                 </button>
-              </div>
-            </div>
-            
-            <div className="p-4 space-y-4">
-              {/* Work Information */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-semibold text-gray-900 mb-3">Work Information</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Work Type</span>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getWorkTypeColor(selectedWork.work_type)}`}>
-                      {formatWorkType(selectedWork.work_type)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Status</span>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getStatusColor(selectedWork.status)}`}>
-                      {selectedWork.status ? selectedWork.status.charAt(0).toUpperCase() + selectedWork.status.slice(1) : 'Unknown'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Published</span>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${selectedWork.is_published ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-800 border-gray-200'}`}>
-                      {selectedWork.is_published ? 'Yes' : 'No'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Date</span>
-                    <span className="text-sm font-medium text-gray-900">{formatDate(selectedWork.date)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Reporting Time</span>
-                    <span className="text-sm font-medium text-gray-900">{formatTime(selectedWork.reporting_time)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Boys Needed</span>
-                    <span className="text-sm font-medium text-gray-900">{selectedWork.no_of_boys_needed || 0}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Attendees</span>
-                    <span className="text-sm font-medium text-gray-900">{selectedWork.attendees || 0}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Customer Information */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-semibold text-gray-900 mb-3">Customer Information</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Name</span>
-                    <span className="text-sm font-medium text-gray-900">{selectedWork.customer_name || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Mobile</span>
-                    <span className="text-sm font-medium text-gray-900">{selectedWork.customer_mobile || 'N/A'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Location Information */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-semibold text-gray-900 mb-3">Location Information</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-start">
-                    <span className="text-sm text-gray-600">Address</span>
-                    <span className="text-sm font-medium text-gray-900 text-right max-w-[60%]">{selectedWork.address || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Place</span>
-                    <span className="text-sm font-medium text-gray-900">{selectedWork.place || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">District</span>
-                    <span className="text-sm font-medium text-gray-900">{selectedWork.district || 'N/A'}</span>
-                  </div>
-                  {selectedWork.location_url && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Map</span>
-                      <a
-                        href={selectedWork.location_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
-                      >
-                        View Location <ExternalLink className="h-3 w-3 ml-1" />
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Assigned Users */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-semibold text-gray-900 mb-3">Assigned Users</h4>
-                {assignedUsers.isLoading ? (
-                  <div className="text-center py-4">
-                    <RefreshCw className="h-5 w-5 animate-spin mx-auto text-blue-500" />
-                    <p className="text-sm text-gray-600 mt-2">Loading assigned users...</p>
-                  </div>
-                ) : selectedWorkAssignedUsers.length === 0 ? (
-                  <p className="text-sm text-gray-600">No users assigned to this work.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {selectedWorkAssignedUsers.map((user) => (
-                      <div key={user.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
-                        <div className="flex items-center">
-                          <div className="flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full mr-3">
-                            <User className="h-4 w-4 text-blue-600" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">{user.user_name}</p>
-                            <p className="text-xs text-gray-500">{user.email}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${user.type === 'supervisor' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}`}>
-                            {user.type}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {formatDate(user.assigned_at)}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                
+                {/* Wage Button - Only show if user is rated */}
+                {user.is_rated && (
+                  <button
+                    onClick={() => {
+                      setSelectedUserForWage(user);
+                      setShowWageModal(true);
+                      setIsWageEditMode(!!user.wage_id);
+                      setEditingWageId(user.wage_id || null);
+                    }}
+                    className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700"
+                  >
+                    {user.wage_id ? 'Edit Wage' : 'Add Wage'}
+                  </button>
                 )}
               </div>
-
-              {/* Additional Information */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-semibold text-gray-900 mb-3">Additional Information</h4>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Auditorium</span>
-                    <span className="text-sm font-medium text-gray-900">{selectedWork.Auditorium_name || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Catering Company</span>
-                    <span className="text-sm font-medium text-gray-900">{selectedWork.Catering_company || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Created</span>
-                    <span className="text-sm font-medium text-gray-900">{formatDate(selectedWork.created_at)}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Updated</span>
-                    <span className="text-sm font-medium text-gray-900">{formatDate(selectedWork.updated_at)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Instructions */}
-              {selectedWork.instructions && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-900 mb-3">Instructions</h4>
-                  <p className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">{selectedWork.instructions}</p>
-                </div>
-              )}
-
-              {/* About Work */}
-              {selectedWork.About_work && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-900 mb-3">About Work</h4>
-                  <p className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">{selectedWork.About_work}</p>
-                </div>
-              )}
             </div>
-
-            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
-              <button
-                onClick={closeModal}
-                className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-              >
-                Close
-              </button>
-            </div>
-          </div>
+          ))}
         </div>
       )}
-
-      {isLoading && (
-  <div className="text-center py-8">
-    <div className="inline-flex items-center">
-      <RefreshCw className="h-5 w-5 animate-spin mr-2 text-blue-500" />
-      <span className="text-gray-600">Loading {activeTab} works...</span>
+      </div>
     </div>
   </div>
 )}
 
-{hasError && (
-  <div className="mb-4">
-    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-      <div className="flex items-center">
-        <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
-        <p className="text-red-700 text-sm font-medium">
-          {cateringWorkList.upcoming?.error || cateringWorkList.past?.error}
-        </p>
-      </div>
-    </div>
-  </div>
+{showRatingModal && selectedUserForRating && selectedWorkForUsers && (
+  <RatingModal
+    user={selectedUserForRating}
+    work={selectedWorkForUsers}
+    onClose={() => {
+      setShowRatingModal(false);
+      setSelectedUserForRating(null);
+      setIsEditMode(false);
+      setEditingRatingId(null);
+    }}
+    onSubmit={(ratingData) => {
+      if (isEditMode && editingRatingId) {
+        dispatch(updateBoyRating({ 
+          ratingId: editingRatingId, 
+          ratingData 
+        }));
+      } else {
+        dispatch(submitAttendanceRating(ratingData));
+      }
+      setShowRatingModal(false);
+      setSelectedUserForRating(null);
+      setIsEditMode(false);
+      setEditingRatingId(null);
+    }}
+    initialData={isEditMode && boyRating.data ? boyRating.data : {}}
+    isEditMode={isEditMode}
+  />
+)}
+
+{showWageModal && selectedUserForWage && selectedWorkForUsers && (
+  <WageFormModal
+    user={selectedUserForWage}
+    work={selectedWorkForUsers}
+    onClose={() => {
+      setShowWageModal(false);
+      setSelectedUserForWage(null);
+      setIsWageEditMode(false);
+      setEditingWageId(null);
+    }}
+    onSubmit={(wageData) => {
+      if (isWageEditMode && editingWageId) {
+        dispatch(updateBoyWage({ 
+          wageId: editingWageId, 
+          wageData 
+        }));
+      } else {
+        dispatch(submitBoyWage(wageData));
+      }
+      setShowWageModal(false);
+      setSelectedUserForWage(null);
+      setIsWageEditMode(false);
+      setEditingWageId(null);
+    }}
+    initialData={isWageEditMode ? {} : {}}
+    isEditMode={isWageEditMode}
+  />
 )}
     </div>
   );
