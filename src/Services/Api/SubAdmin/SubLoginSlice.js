@@ -311,6 +311,51 @@ export const addExtraExpense = createAsyncThunk(
   }
 );
 
+export const submitSubAdminSupervisorWage = createAsyncThunk(
+  'subAdminAuth/submitSubAdminSupervisorWage',
+  async (wageData, { getState, rejectWithValue }) => {
+    try {
+      const { subAdminAuth } = getState();
+      const response = await axios.post(`${API_BASE_URL}/sub_admin/submit-subadmin-wage/`, wageData, {
+        headers: {
+          'Authorization': `Bearer ${subAdminAuth.tokens?.access}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 401) {
+        return rejectWithValue('Session expired. Please login again.');
+      }
+      return rejectWithValue(error.response?.data?.message || 'Failed to submit wage');
+    }
+  }
+);
+
+// API for updating subadmin/supervisor wage (assuming similar pattern)
+export const updateSubAdminSupervisorWage = createAsyncThunk(
+  'subAdminAuth/updateSubAdminSupervisorWage',
+  async ({ wageId, wageData }, { getState, rejectWithValue }) => {
+    try {
+      const { subAdminAuth } = getState();
+      const response = await axios.patch(`${API_BASE_URL}/sub_admin/submit-subadmin-wage/${wageId}/`, wageData, {
+        headers: {
+          'Authorization': `Bearer ${subAdminAuth.tokens?.access}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 401) {
+        return rejectWithValue('Session expired. Please login again.');
+      }
+      return rejectWithValue(error.response?.data?.message || 'Failed to update wage');
+    }
+  }
+);
+
 // Initialize state
 const storedTokens = getTokensFromStorage();
 const storedUser = getUserFromStorage();
@@ -324,17 +369,17 @@ const initialState = {
   error: null,
   users: [],
   cateringWorks: [],
-boyRating: {
-  isLoading: false,
-  error: null,
-  data: null,
-  success: false,
-},
-updateRating: {
-  isLoading: false,
-  error: null,
-  success: false,
-},
+  boyRating: {
+    isLoading: false,
+    error: null,
+    data: null,
+    success: false,
+  },
+  updateRating: {
+    isLoading: false,
+    error: null,
+    success: false,
+  },
   userCreation: {
     isLoading: false,
     error: null,
@@ -351,9 +396,16 @@ updateRating: {
     success: false,
   },
   cateringWorkList: {
-    isLoading: false,
-    error: null,
-    data: [],
+    upcoming: {
+      data: [],
+      isLoading: false,
+      error: null
+    },
+    past: {
+      data: [],
+      isLoading: false,
+      error: null
+    }
   },
   assignedUsers: {
     isLoading: false,
@@ -368,26 +420,34 @@ updateRating: {
   selectedWork: null,
   showAttendanceModal: false,
   boyWage: {
-  isLoading: false,
-  error: null,
-  success: false,
-},
- extraExpenses: {
     isLoading: false,
     error: null,
     success: false,
   },
-cateringWorkList: {
-    upcoming: {
-      data: [],
-      isLoading: false,
-      error: null
-    },
-    past: {
-      data: [],
-      isLoading: false,
-      error: null
-    }
+  subAdminSupervisorWage: {
+    isLoading: false,
+    error: null,
+    success: false,
+  },
+  updateBoyWage: {
+    isLoading: false,
+    error: null,
+    success: false,
+  },
+  updateSubAdminSupervisorWage: {
+    isLoading: false,
+    error: null,
+    success: false,
+  },
+  workExpenses: {
+    isLoading: false,
+    error: null,
+    success: false,
+  },
+  extraExpenses: {
+    isLoading: false,
+    error: null,
+    success: false,
   }
 };
 
@@ -465,6 +525,22 @@ const subAdminAuthSlice = createSlice({
     clearCateringWorkError: (state) => {
       state.cateringWorkList.error = null;
     },
+    clearSubAdminSupervisorWageState: (state) => {
+  state.subAdminSupervisorWage.error = null;
+  state.subAdminSupervisorWage.success = false;
+},
+clearUpdateBoyWageState: (state) => {
+  state.updateBoyWage.error = null;
+  state.updateBoyWage.success = false;
+},
+clearUpdateSubAdminSupervisorWageState: (state) => {
+  state.updateSubAdminSupervisorWage.error = null;
+  state.updateSubAdminSupervisorWage.success = false;
+},
+clearWorkExpensesState: (state) => {
+  state.workExpenses.error = null;
+  state.workExpenses.success = false;
+},
     // Add this to your reducers object
 clearExtraExpenseState: (state) => {
   state.extraExpenses.error = null;
@@ -741,6 +817,48 @@ clearUpdateRatingState: (state) => {
     localStorage.removeItem('subAdminUser');
   }
 })
+// Submit SubAdmin/Supervisor Wage
+.addCase(submitSubAdminSupervisorWage.pending, (state) => {
+  state.subAdminSupervisorWage.isLoading = true;
+  state.subAdminSupervisorWage.error = null;
+  state.subAdminSupervisorWage.success = false;
+})
+.addCase(submitSubAdminSupervisorWage.fulfilled, (state, action) => {
+  state.subAdminSupervisorWage.isLoading = false;
+  state.subAdminSupervisorWage.success = true;
+})
+.addCase(submitSubAdminSupervisorWage.rejected, (state, action) => {
+  state.subAdminSupervisorWage.isLoading = false;
+  state.subAdminSupervisorWage.error = action.payload;
+  if (action.payload === 'Session expired. Please login again.') {
+    state.admin = null;
+    state.tokens = null;
+    state.isLoggedIn = false;
+    localStorage.removeItem('subAdminToken');
+    localStorage.removeItem('subAdminUser');
+  }
+})
+// Update SubAdmin/Supervisor Wage
+.addCase(updateSubAdminSupervisorWage.pending, (state) => {
+  state.updateSubAdminSupervisorWage.isLoading = true;
+  state.updateSubAdminSupervisorWage.error = null;
+  state.updateSubAdminSupervisorWage.success = false;
+})
+.addCase(updateSubAdminSupervisorWage.fulfilled, (state, action) => {
+  state.updateSubAdminSupervisorWage.isLoading = false;
+  state.updateSubAdminSupervisorWage.success = true;
+})
+.addCase(updateSubAdminSupervisorWage.rejected, (state, action) => {
+  state.updateSubAdminSupervisorWage.isLoading = false;
+  state.updateSubAdminSupervisorWage.error = action.payload;
+  if (action.payload === 'Session expired. Please login again.') {
+    state.admin = null;
+    state.tokens = null;
+    state.isLoggedIn = false;
+    localStorage.removeItem('subAdminToken');
+    localStorage.removeItem('subAdminUser');
+  }
+});
   },
 });
 
@@ -760,7 +878,11 @@ export const {
   clearExtraExpenseState,
   clearBoyWageState,
   clearBoyRatingState,
-  clearUpdateRatingState
+  clearUpdateRatingState,
+  clearSubAdminSupervisorWageState,
+  clearUpdateBoyWageState,
+  clearUpdateSubAdminSupervisorWageState,
+  clearWorkExpensesState
 } = subAdminAuthSlice.actions;
 
 

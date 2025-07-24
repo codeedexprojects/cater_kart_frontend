@@ -29,7 +29,9 @@ import {
   MapPin,
   Phone,
   Mail,
-  Star
+  Star,
+  Loader2,
+  FileX
 } from 'lucide-react';
 
 const WorkAnalytics = () => {
@@ -39,16 +41,24 @@ const WorkAnalytics = () => {
   const [selectedWork, setSelectedWork] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
   const [dateRange, setDateRange] = useState('all');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState('grid');
   const [selectedCard, setSelectedCard] = useState('overview');
+  const [paymentSummaryLoading, setPaymentSummaryLoading] = useState(false);
 
   useEffect(() => {
     dispatch(getWorkAnalyticsList());
   }, [dispatch]);
 
-  const handleWorkSelect = (workId) => {
-    dispatch(getWorkPaymentSummary(workId));
-    setSelectedWork(workId);
+  const handleWorkSelect = async (workId) => {
+    setPaymentSummaryLoading(true);
+    try {
+      await dispatch(getWorkPaymentSummary(workId));
+      setSelectedWork(workId);
+    } catch (error) {
+      console.error('Error fetching payment summary:', error);
+    } finally {
+      setPaymentSummaryLoading(false);
+    }
   };
 
   const closeDetails = () => {
@@ -64,6 +74,23 @@ const WorkAnalytics = () => {
       return matchesSearch && matchesFilter;
     }) || [];
   }, [analyticsList, searchTerm, filterStatus]);
+
+  // Loading Skeleton Component
+  const LoadingSkeleton = ({ height = "h-20", className = "" }) => (
+    <div className={`animate-pulse bg-gray-200 rounded-xl ${height} ${className}`}></div>
+  );
+
+  // No Data Component
+  const NoDataMessage = ({ icon: Icon, title, description, action }) => (
+    <div className="bg-white rounded-2xl p-12 shadow-sm border border-gray-100 text-center">
+      <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <Icon className="h-10 w-10 text-gray-400" />
+      </div>
+      <h3 className="text-xl font-semibold text-gray-900 mb-2">{title}</h3>
+      <p className="text-gray-600 mb-4">{description}</p>
+      {action}
+    </div>
+  );
 
   const StatCard = ({ title, value, icon: Icon, change, trend, color = "blue" }) => (
     <div className={`bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 cursor-pointer ${selectedCard === title.toLowerCase().replace(/\s+/g, '-') ? `ring-2 ring-${color}-500` : ''}`}
@@ -150,6 +177,93 @@ const WorkAnalytics = () => {
     </div>
   );
 
+  // Team Section Component with loading and no data states
+  const TeamSection = ({ title, members, icon: Icon, color, gradientFrom, gradientTo }) => {
+    if (!members || members.length === 0) {
+      return (
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <Icon className={`h-5 w-5 mr-2 text-${color}-500`} />
+            {title} (0)
+          </h3>
+          <NoDataMessage
+            icon={FileX}
+            title={`No ${title} Found`}
+            description={`No ${title.toLowerCase()} have been assigned to this work yet.`}
+            action={null}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+          <Icon className={`h-5 w-5 mr-2 text-${color}-500`} />
+          {title} ({members.length})
+        </h3>
+        <div className="space-y-3">
+          {members.map((member, index) => (
+            <div key={index} className={`bg-gradient-to-r from-${gradientFrom}-50 to-${gradientTo}-50 rounded-xl p-4 border border-${color}-200`}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center">
+                  <div className={`w-10 h-10 bg-${color}-100 rounded-full flex items-center justify-center mr-3`}>
+                    <Icon className={`h-5 w-5 text-${color}-600`} />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{member.user_name}</h4>
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      member.payment_status === 'paid' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {member.payment_status === 'paid' ? 'Paid' : 'Pending'}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-gray-900">₹{member.total_wage}</p>
+                  <p className="text-xs text-gray-500">Total Wage</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <p className="text-gray-600">Base Fare</p>
+                  <p className="font-semibold">₹{member.base_fare || 0}</p>
+                </div>
+                {member.travel_allowance !== undefined && (
+                  <div>
+                    <p className="text-gray-600">Travel Allow.</p>
+                    <p className="font-semibold">₹{member.travel_allowance}</p>
+                  </div>
+                )}
+                {member.over_time !== undefined && (
+                  <div>
+                    <p className="text-gray-600">Overtime</p>
+                    <p className="font-semibold">₹{member.over_time}</p>
+                  </div>
+                )}
+                {member.bonus !== undefined && (
+                  <div>
+                    <p className="text-gray-600">Bonus</p>
+                    <p className="font-semibold">₹{member.bonus}</p>
+                  </div>
+                )}
+                {member.rating_amount !== undefined && (
+                  <div>
+                    <p className="text-gray-600">Rating Bonus</p>
+                    <p className="font-semibold">₹{member.rating_amount}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 p-6">
       {/* Header */}
@@ -164,9 +278,14 @@ const WorkAnalytics = () => {
           <div className="flex items-center space-x-3">
             <button 
               onClick={() => dispatch(getWorkAnalyticsList())}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
+              disabled={loading}
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
+              {loading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
               Refresh
             </button>
           </div>
@@ -184,6 +303,7 @@ const WorkAnalytics = () => {
               className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              disabled={loading}
             />
           </div>
         </div>
@@ -191,9 +311,28 @@ const WorkAnalytics = () => {
 
       {/* Loading State */}
       {loading && (
-        <div className="bg-white rounded-2xl p-12 shadow-sm border border-gray-100 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 text-lg">Loading analytics data...</p>
+        <div className="space-y-6">
+          <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+            {[...Array(6)].map((_, index) => (
+              <div key={index} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <LoadingSkeleton height="h-12 w-12" />
+                    <div className="space-y-2">
+                      <LoadingSkeleton height="h-4 w-32" />
+                      <LoadingSkeleton height="h-3 w-24" />
+                    </div>
+                  </div>
+                  <LoadingSkeleton height="h-6 w-16" />
+                </div>
+                <div className="space-y-3">
+                  <LoadingSkeleton height="h-4" />
+                  <LoadingSkeleton height="h-4" />
+                  <LoadingSkeleton height="h-4" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -224,14 +363,23 @@ const WorkAnalytics = () => {
       )}
 
       {/* Payment Summary Modal */}
-      {paymentSummary && selectedWork && (
+      {selectedWork && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
             {/* Modal Header */}
             <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">{paymentSummary.work_title}</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    {paymentSummaryLoading ? (
+                      <div className="flex items-center">
+                        <Loader2 className="h-6 w-6 mr-2 animate-spin" />
+                        Loading...
+                      </div>
+                    ) : (
+                      paymentSummary?.work_title || 'Work Details'
+                    )}
+                  </h2>
                   <p className="text-gray-600 mt-1">Payment Summary & Details</p>
                 </div>
                 <button
@@ -245,280 +393,186 @@ const WorkAnalytics = () => {
 
             {/* Modal Content */}
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                {/* Team Members Summary */}
-                <div className="lg:col-span-2 space-y-6">
-                  
-                  {/* Captains */}
-                  {paymentSummary.captains?.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                        <Award className="h-5 w-5 mr-2 text-yellow-500" />
-                        Captains ({paymentSummary.captains.length})
-                      </h3>
-                      <div className="space-y-3">
-                        {paymentSummary.captains.map((captain, index) => (
-                          <div key={index} className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-4 border border-yellow-200">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center">
-                                <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
-                                  <Star className="h-5 w-5 text-yellow-600" />
-                                </div>
-                                <div>
-                                  <h4 className="font-semibold text-gray-900">{captain.user_name}</h4>
-                                  <span className={`text-xs px-2 py-1 rounded-full ${
-                                    captain.payment_status === 'paid' 
-                                      ? 'bg-green-100 text-green-800' 
-                                      : 'bg-red-100 text-red-800'
-                                  }`}>
-                                    {captain.payment_status === 'paid' ? 'Paid' : 'Pending'}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-2xl font-bold text-gray-900">₹{captain.total_wage}</p>
-                                <p className="text-xs text-gray-500">Total Wage</p>
-                              </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                              <div>
-                                <p className="text-gray-600">Base Fare</p>
-                                <p className="font-semibold">₹{captain.base_fare}</p>
-                              </div>
-                              <div>
-                                <p className="text-gray-600">Travel Allow.</p>
-                                <p className="font-semibold">₹{captain.travel_allowance}</p>
-                              </div>
-                              <div>
-                                <p className="text-gray-600">Overtime</p>
-                                <p className="font-semibold">₹{captain.over_time}</p>
-                              </div>
-                              <div>
-                                <p className="text-gray-600">Bonus</p>
-                                <p className="font-semibold">₹{captain.bonus}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Boys */}
-                  {paymentSummary.boys?.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                        <Users className="h-5 w-5 mr-2 text-blue-500" />
-                        Team Members ({paymentSummary.boys.length})
-                      </h3>
-                      <div className="space-y-3">
-                        {paymentSummary.boys.map((boy, index) => (
-                          <div key={index} className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center">
-                                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                                  <Users className="h-5 w-5 text-blue-600" />
-                                </div>
-                                <div>
-                                  <h4 className="font-semibold text-gray-900">{boy.user_name}</h4>
-                                  <span className={`text-xs px-2 py-1 rounded-full ${
-                                    boy.payment_status === 'paid' 
-                                      ? 'bg-green-100 text-green-800' 
-                                      : 'bg-red-100 text-red-800'
-                                  }`}>
-                                    {boy.payment_status === 'paid' ? 'Paid' : 'Pending'}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-2xl font-bold text-gray-900">₹{boy.total_wage}</p>
-                                <p className="text-xs text-gray-500">Total Wage</p>
-                              </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                              <div>
-                                <p className="text-gray-600">Base Fare</p>
-                                <p className="font-semibold">₹{boy.base_fare}</p>
-                              </div>
-                              <div>
-                                <p className="text-gray-600">Rating Bonus</p>
-                                <p className="font-semibold">₹{boy.rating_amount}</p>
-                              </div>
-                              <div>
-                                <p className="text-gray-600">Travel Allow.</p>
-                                <p className="font-semibold">₹{boy.travel_allowance}</p>
-                              </div>
-                              <div>
-                                <p className="text-gray-600">Overtime</p>
-                                <p className="font-semibold">₹{boy.over_time}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Head Boys */}
-                  {paymentSummary.head_boys?.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                        <Briefcase className="h-5 w-5 mr-2 text-purple-500" />
-                        Head Boys ({paymentSummary.head_boys.length})
-                      </h3>
-                      <div className="space-y-3">
-                        {paymentSummary.head_boys.map((headBoy, index) => (
-                          <div key={index} className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center">
-                                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mr-3">
-                                  <Briefcase className="h-5 w-5 text-purple-600" />
-                                </div>
-                                <div>
-                                  <h4 className="font-semibold text-gray-900">{headBoy.user_name}</h4>
-                                  <span className={`text-xs px-2 py-1 rounded-full ${
-                                    headBoy.payment_status === 'paid' 
-                                      ? 'bg-green-100 text-green-800' 
-                                      : 'bg-red-100 text-red-800'
-                                  }`}>
-                                    {headBoy.payment_status === 'paid' ? 'Paid' : 'Pending'}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-2xl font-bold text-gray-900">₹{headBoy.total_wage}</p>
-                                <p className="text-xs text-gray-500">Total Wage</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Supervisors */}
-                  {paymentSummary.supervisors?.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                        <Eye className="h-5 w-5 mr-2 text-green-500" />
-                        Supervisors ({paymentSummary.supervisors.length})
-                      </h3>
-                      <div className="space-y-3">
-                        {paymentSummary.supervisors.map((supervisor, index) => (
-                          <div key={index} className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center">
-                                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                                  <Eye className="h-5 w-5 text-green-600" />
-                                </div>
-                                <div>
-                                  <h4 className="font-semibold text-gray-900">{supervisor.user_name}</h4>
-                                  <span className={`text-xs px-2 py-1 rounded-full ${
-                                    supervisor.payment_status === 'paid' 
-                                      ? 'bg-green-100 text-green-800' 
-                                      : 'bg-red-100 text-red-800'
-                                  }`}>
-                                    {supervisor.payment_status === 'paid' ? 'Paid' : 'Pending'}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-2xl font-bold text-gray-900">₹{supervisor.total_wage}</p>
-                                <p className="text-xs text-gray-500">Total Wage</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Summary Panel */}
+              {paymentSummaryLoading ? (
                 <div className="space-y-6">
-                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Summary</h3>
-                    
-                    {/* Calculate totals */}
-                    {(() => {
-                      const totalPaid = [
-                        ...(paymentSummary.boys || []),
-                        ...(paymentSummary.head_boys || []),
-                        ...(paymentSummary.supervisors || []),
-                        ...(paymentSummary.captains || [])
-                      ].reduce((sum, person) => sum + parseFloat(person.total_wage || 0), 0);
-
-                      const paidAmount = [
-                        ...(paymentSummary.boys || []),
-                        ...(paymentSummary.head_boys || []),
-                        ...(paymentSummary.supervisors || []),
-                        ...(paymentSummary.captains || [])
-                      ].filter(person => person.payment_status === 'paid')
-                       .reduce((sum, person) => sum + parseFloat(person.total_wage || 0), 0);
-
-                      const pendingAmount = totalPaid - paidAmount;
-
-                      return (
-                        <div className="space-y-4">
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-600">Total Wages</span>
-                            <span className="text-xl font-bold text-gray-900">₹{totalPaid.toLocaleString()}</span>
-                          </div>
-                          
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-600 flex items-center">
-                              <CheckCircle className="h-4 w-4 text-green-500 mr-1" />
-                              Paid
-                            </span>
-                            <span className="text-lg font-semibold text-green-600">₹{paidAmount.toLocaleString()}</span>
-                          </div>
-                          
-                          <div className="flex justify-between items-center">
-                            <span className="text-gray-600 flex items-center">
-                              <XCircle className="h-4 w-4 text-red-500 mr-1" />
-                              Pending
-                            </span>
-                            <span className="text-lg font-semibold text-red-600">₹{pendingAmount.toLocaleString()}</span>
-                          </div>
-
-                          <div className="pt-4 border-t border-gray-200">
-                            <div className="flex justify-between items-center">
-                              <span className="text-gray-600">Total Team</span>
-                              <span className="text-lg font-semibold text-gray-900">
-                                {(paymentSummary.boys?.length || 0) + 
-                                 (paymentSummary.head_boys?.length || 0) + 
-                                 (paymentSummary.supervisors?.length || 0) + 
-                                 (paymentSummary.captains?.length || 0)} members
-                              </span>
-                            </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 space-y-6">
+                      {[...Array(3)].map((_, index) => (
+                        <div key={index}>
+                          <LoadingSkeleton height="h-6 w-48" className="mb-4" />
+                          <div className="space-y-3">
+                            {[...Array(2)].map((_, idx) => (
+                              <LoadingSkeleton key={idx} height="h-24" />
+                            ))}
                           </div>
                         </div>
-                      );
-                    })()}
+                      ))}
+                    </div>
+                    <div className="space-y-6">
+                      <LoadingSkeleton height="h-48" />
+                      <LoadingSkeleton height="h-32" />
+                    </div>
+                  </div>
+                </div>
+              ) : !paymentSummary ? (
+                <NoDataMessage
+                  icon={FileX}
+                  title="No Payment Data Found"
+                  description="Unable to load payment summary for this work."
+                  action={
+                    <button 
+                      onClick={() => handleWorkSelect(selectedWork)}
+                      className="bg-blue-600 text-white px-6 py-2 rounded-xl hover:bg-blue-700 transition-colors"
+                    >
+                      Retry
+                    </button>
+                  }
+                />
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  
+                  {/* Team Members Summary */}
+                  <div className="lg:col-span-2 space-y-6">
+                    
+                    {/* Captains */}
+                    <TeamSection
+                      title="Captains"
+                      members={paymentSummary.captains}
+                      icon={Award}
+                      color="yellow"
+                      gradientFrom="yellow"
+                      gradientTo="orange"
+                    />
+
+                    {/* Boys */}
+                    <TeamSection
+                      title="Team Members"
+                      members={paymentSummary.boys}
+                      icon={Users}
+                      color="blue"
+                      gradientFrom="blue"
+                      gradientTo="indigo"
+                    />
+
+                    {/* Head Boys */}
+                    <TeamSection
+                      title="Head Boys"
+                      members={paymentSummary.head_boys}
+                      icon={Briefcase}
+                      color="purple"
+                      gradientFrom="purple"
+                      gradientTo="pink"
+                    />
+
+                    {/* Supervisors */}
+                    <TeamSection
+                      title="Supervisors"
+                      members={paymentSummary.supervisors}
+                      icon={Eye}
+                      color="green"
+                      gradientFrom="green"
+                      gradientTo="emerald"
+                    />
                   </div>
 
-                  {/* Extra Expenses */}
-                  {paymentSummary.extra_expense?.length > 0 && (
-                    <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-6">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                        <AlertCircle className="h-5 w-5 mr-2 text-orange-500" />
-                        Extra Expenses
-                      </h3>
-                      <div className="space-y-3">
-                        {paymentSummary.extra_expense.map((expense, index) => (
-                          <div key={index} className="flex justify-between items-center">
-                            <span className="text-gray-600">{expense.description || `Expense ${index + 1}`}</span>
-                            <span className="font-semibold text-red-600">₹{expense.amount}</span>
+                  {/* Summary Panel */}
+                  <div className="space-y-6">
+                    <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Summary</h3>
+                      
+                      {/* Calculate totals */}
+                      {(() => {
+                        const allMembers = [
+                          ...(paymentSummary.boys || []),
+                          ...(paymentSummary.head_boys || []),
+                          ...(paymentSummary.supervisors || []),
+                          ...(paymentSummary.captains || [])
+                        ];
+
+                        if (allMembers.length === 0) {
+                          return (
+                            <NoDataMessage
+                              icon={Users}
+                              title="No Team Members"
+                              description="No team members found for this work."
+                              action={null}
+                            />
+                          );
+                        }
+
+                        const totalPaid = allMembers.reduce((sum, person) => sum + parseFloat(person.total_wage || 0), 0);
+                        const paidAmount = allMembers
+                          .filter(person => person.payment_status === 'paid')
+                          .reduce((sum, person) => sum + parseFloat(person.total_wage || 0), 0);
+                        const pendingAmount = totalPaid - paidAmount;
+
+                        return (
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">Total Wages</span>
+                              <span className="text-xl font-bold text-gray-900">₹{totalPaid.toLocaleString()}</span>
+                            </div>
+                            
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600 flex items-center">
+                                <CheckCircle className="h-4 w-4 text-green-500 mr-1" />
+                                Paid
+                              </span>
+                              <span className="text-lg font-semibold text-green-600">₹{paidAmount.toLocaleString()}</span>
+                            </div>
+                            
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600 flex items-center">
+                                <XCircle className="h-4 w-4 text-red-500 mr-1" />
+                                Pending
+                              </span>
+                              <span className="text-lg font-semibold text-red-600">₹{pendingAmount.toLocaleString()}</span>
+                            </div>
+
+                            <div className="pt-4 border-t border-gray-200">
+                              <div className="flex justify-between items-center">
+                                <span className="text-gray-600">Total Team</span>
+                                <span className="text-lg font-semibold text-gray-900">
+                                  {allMembers.length} members
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                        ))}
-                      </div>
+                        );
+                      })()}
                     </div>
-                  )}
+
+                    {/* Extra Expenses */}
+                    {paymentSummary.extra_expense && paymentSummary.extra_expense.length > 0 ? (
+                      <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                          <AlertCircle className="h-5 w-5 mr-2 text-orange-500" />
+                          Extra Expenses
+                        </h3>
+                        <div className="space-y-3">
+                          {paymentSummary.extra_expense.map((expense, index) => (
+                            <div key={index} className="flex justify-between items-center">
+                              <span className="text-gray-600">{expense.description || `Expense ${index + 1}`}</span>
+                              <span className="font-semibold text-red-600">₹{expense.amount}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                          <AlertCircle className="h-5 w-5 mr-2 text-gray-500" />
+                          Extra Expenses
+                        </h3>
+                        <div className="text-center py-4">
+                          <FileX className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                          <p className="text-sm text-gray-500">No extra expenses recorded</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

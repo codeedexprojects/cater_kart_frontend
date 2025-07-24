@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { getCateringWorkList, getAssignedUsers, submitAttendanceRating,getBoyRating, updateBoyRating,submitBoyWage } from '../../Services/Api/SubAdmin/SubLoginSlice';
+import { getCateringWorkList, getAssignedUsers, submitAttendanceRating, getBoyRating, updateBoyRating, submitBoyWage, submitSubAdminSupervisorWage, updateSubAdminSupervisorWage, addExtraExpense } from '../../Services/Api/SubAdmin/SubLoginSlice';
 import { Search, Filter, Calendar, MapPin, User, Phone, Eye, AlertCircle, RefreshCw, Users, Clock, ExternalLink, Star, StarOff, CheckCircle, X } from 'lucide-react';
 
 const CateringWorks = () => {
@@ -25,6 +25,8 @@ const CateringWorks = () => {
   const [isWageEditMode, setIsWageEditMode] = useState(false);
   const [editingWageId, setEditingWageId] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [selectedWorkForExpense, setSelectedWorkForExpense] = useState(null);
 
   // REMOVED DUPLICATE boyRating DECLARATION AND FIXED ratingData STATE
   const [ratingData, setRatingData] = useState({
@@ -164,7 +166,7 @@ useEffect(() => {
   };
 
   const handleRatingChange = (field, value) => {
-    setRatings(prev => ({
+    setRatingData(prev => ({
       ...prev,
       [field]: value
     }));
@@ -337,7 +339,7 @@ const RatingModal = ({
   );
 };
 
-// New WageFormModal component
+// Updated WageFormModal component - for individual users
 const WageFormModal = ({ 
   user, 
   work, 
@@ -347,55 +349,28 @@ const WageFormModal = ({
   isEditMode = false 
 }) => {
   const [wageData, setWageData] = useState({
+    rating_amount: initialData.rating_amount || '',
     travel_allowance: initialData.travel_allowance || '',
     over_time: initialData.over_time || '',
     long_fare: initialData.long_fare || '',
     bonus: initialData.bonus || '',
-    payment_status: initialData.payment_status || 'not_paid',
-    expenses: initialData.expenses || []
+    extra_loading: initialData.extra_loading || '',
+    extra_setting: initialData.extra_setting || '',
+    payment_status: initialData.payment_status || 'not_paid'
   });
-  
-  const [newExpense, setNewExpense] = useState({
-    expense_type: '',
-    amount: '',
-    description: ''
-  });
-
-  const handleAddExpense = () => {
-    if (newExpense.expense_type && newExpense.amount) {
-      setWageData(prev => ({
-        ...prev,
-        expenses: [...prev.expenses, {
-          expense_type: newExpense.expense_type,
-          amount: parseFloat(newExpense.amount),
-          description: newExpense.description
-        }]
-      }));
-      setNewExpense({
-        expense_type: '',
-        amount: '',
-        description: ''
-      });
-    }
-  };
-
-  const handleRemoveExpense = (index) => {
-    setWageData(prev => ({
-      ...prev,
-      expenses: prev.expenses.filter((_, i) => i !== index)
-    }));
-  };
 
   const handleSubmit = () => {
     const submitData = {
       user: user.user_id,
       work: work.id,
+      rating_amount: wageData.rating_amount ? parseFloat(wageData.rating_amount) : 0,
       travel_allowance: wageData.travel_allowance ? parseFloat(wageData.travel_allowance) : 0,
       over_time: wageData.over_time ? parseFloat(wageData.over_time) : 0,
       long_fare: wageData.long_fare ? parseFloat(wageData.long_fare) : 0,
       bonus: wageData.bonus ? parseFloat(wageData.bonus) : 0,
-      payment_status: wageData.payment_status,
-      expenses: wageData.expenses
+      extra_loading: wageData.extra_loading ? parseFloat(wageData.extra_loading) : 0,
+      extra_setting: wageData.extra_setting ? parseFloat(wageData.extra_setting) : 0,
+      payment_status: wageData.payment_status
     };
     onSubmit(submitData);
   };
@@ -423,6 +398,18 @@ const WageFormModal = ({
             <h4 className="text-lg font-semibold text-blue-900 mb-4">Wage Details</h4>
             
             <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Rating Amount</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={wageData.rating_amount}
+                  onChange={(e) => setWageData(prev => ({...prev, rating_amount: e.target.value}))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Travel Allowance</label>
                 <input
@@ -472,6 +459,30 @@ const WageFormModal = ({
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Extra Loading</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={wageData.extra_loading}
+                  onChange={(e) => setWageData(prev => ({...prev, extra_loading: e.target.value}))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Extra Setting</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={wageData.extra_setting}
+                  onChange={(e) => setWageData(prev => ({...prev, extra_setting: e.target.value}))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Payment Status</label>
                 <select
                   value={wageData.payment_status}
@@ -484,15 +495,110 @@ const WageFormModal = ({
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Extra Expenses Section */}
-          <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-            <h4 className="text-lg font-semibold text-green-900 mb-4">Extra Expenses</h4>
-            
-            {/* Expense List */}
-            {wageData.expenses.length > 0 && (
-              <div className="mb-4 space-y-2">
-                {wageData.expenses.map((expense, index) => (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 space-y-3">
+          <button
+            onClick={handleSubmit}
+            className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-base"
+          >
+            {isEditMode ? 'Update Wage' : 'Submit Wage'}
+          </button>
+          
+          <button
+            onClick={onClose}
+            className="w-full bg-gray-100 text-gray-700 py-4 px-4 rounded-xl font-medium hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-base"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// FIXED ExpenseModal component - for entire work expenses
+const ExpenseModal = ({ 
+  work, 
+  onClose, 
+  onSubmit,
+  initialData = {}
+}) => {
+  const [expenseData, setExpenseData] = useState({
+    expenses: initialData.expenses || []
+  });
+  
+  const [newExpense, setNewExpense] = useState({
+    catering_work: work.id, // FIXED: Set the work ID here
+    expense_type: '',
+    amount: '',
+    description: ''
+  });
+
+  const handleAddExpense = () => {
+    if (newExpense.expense_type && newExpense.amount) {
+      setExpenseData(prev => ({
+        ...prev,
+        expenses: [...prev.expenses, {
+          catering_work: work.id, // FIXED: Include catering_work ID
+          expense_type: newExpense.expense_type,
+          amount: parseFloat(newExpense.amount),
+          description: newExpense.description
+        }]
+      }));
+      setNewExpense({
+        catering_work: work.id, // FIXED: Keep work ID when resetting
+        expense_type: '',
+        amount: '',
+        description: ''
+      });
+    }
+  };
+
+  const handleRemoveExpense = (index) => {
+    setExpenseData(prev => ({
+      ...prev,
+      expenses: prev.expenses.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleSubmit = () => {
+    // FIXED: Submit each expense individually as per API structure
+    expenseData.expenses.forEach(expense => {
+      const submitData = {
+        catering_work: work.id,
+        expense_type: expense.expense_type,
+        amount: expense.amount.toString(), // Convert to string as per API
+        description: expense.description
+      };
+      onSubmit(submitData);
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50">
+      <div className="bg-white rounded-t-2xl w-full max-h-[90vh] overflow-y-auto animate-slide-up">
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Work Expenses - {work.Auditorium_name}
+            </h3>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 p-2"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+        
+        <div className="p-4 space-y-6 pb-40">
+          {/* Expense List */}
+          {expenseData.expenses.length > 0 && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="text-lg font-semibold text-gray-900 mb-4">Current Expenses</h4>
+              <div className="space-y-2">
+                {expenseData.expenses.map((expense, index) => (
                   <div key={index} className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200">
                     <div>
                       <p className="font-medium">{expense.expense_type}</p>
@@ -510,9 +616,12 @@ const WageFormModal = ({
                   </div>
                 ))}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Add New Expense Form */}
+          {/* Add New Expense Form */}
+          <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+            <h4 className="text-lg font-semibold text-green-900 mb-4">Add New Expense</h4>
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Expense Type</label>
@@ -520,8 +629,8 @@ const WageFormModal = ({
                   type="text"
                   value={newExpense.expense_type}
                   onChange={(e) => setNewExpense(prev => ({...prev, expense_type: e.target.value}))}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="e.g., Food For boys"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="e.g., Transportation, Food"
                 />
               </div>
 
@@ -530,9 +639,10 @@ const WageFormModal = ({
                   <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
                   <input
                     type="number"
+                    step="0.01"
                     value={newExpense.amount}
                     onChange={(e) => setNewExpense(prev => ({...prev, amount: e.target.value}))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     placeholder="0.00"
                   />
                 </div>
@@ -543,7 +653,7 @@ const WageFormModal = ({
                     type="text"
                     value={newExpense.description}
                     onChange={(e) => setNewExpense(prev => ({...prev, description: e.target.value}))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     placeholder="Optional"
                   />
                 </div>
@@ -551,7 +661,7 @@ const WageFormModal = ({
 
               <button
                 onClick={handleAddExpense}
-                className="w-full bg-green-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 text-sm"
+                className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 text-sm"
               >
                 Add Expense
               </button>
@@ -564,7 +674,7 @@ const WageFormModal = ({
             onClick={handleSubmit}
             className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-base"
           >
-            {isEditMode ? 'Update Wage' : 'Submit Wage'}
+            Save Expenses
           </button>
           
           <button
@@ -718,7 +828,7 @@ const WageFormModal = ({
             </div>
           </div>
 
-          {/* Boys Needed - Now a Button */}
+          {/* Boys Needed Button */}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -726,11 +836,26 @@ const WageFormModal = ({
               setShowAssignedUsersModal(true);
               dispatch(getAssignedUsers(work.id));
             }}
-            className="w-full bg-blue-50 hover:bg-blue-100 rounded-lg p-3 mb-4 transition-colors"
+            className="w-full bg-blue-50 hover:bg-blue-100 rounded-lg p-3 mb-3 transition-colors"
           >
             <div className="flex items-center justify-center">
               <Users className="h-5 w-5 text-blue-600 mr-2" />
               <span className="text-base font-bold text-blue-900">{work.no_of_boys_needed || 0} Boys Needed</span>
+            </div>
+          </button>
+
+          {/* Work Expenses Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedWorkForExpense(work);
+              setShowExpenseModal(true);
+            }}
+            className="w-full bg-green-50 hover:bg-green-100 rounded-lg p-3 mb-4 transition-colors"
+          >
+            <div className="flex items-center justify-center">
+              <div className="h-5 w-5 text-green-600 mr-2">₹</div>
+              <span className="text-base font-bold text-green-900">Work Expenses</span>
             </div>
           </button>
         </div>
@@ -958,24 +1083,26 @@ const WageFormModal = ({
               </div>
               
               <div className="flex gap-2">
-                {/* Rate Button */}
-                <button
-                  onClick={() => {
-                    setSelectedUserForRating(user);
-                    setShowRatingModal(true);
-                    setIsEditMode(!!user.is_rated);
-                    setEditingRatingId(user.is_rated || null);
-                    if (user.is_rated) {
-                      dispatch(getBoyRating(user.is_rated));
-                    }
-                  }}
-                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
-                >
-                  {user.is_rated ? 'Edit Rating' : 'Rate User'}
-                </button>
+                {/* Rate Button - Only for boys */}
+                {user.type === 'boys' && (
+                  <button
+                    onClick={() => {
+                      setSelectedUserForRating(user);
+                      setShowRatingModal(true);
+                      setIsEditMode(!!user.is_rated);
+                      setEditingRatingId(user.is_rated || null);
+                      if (user.is_rated) {
+                        dispatch(getBoyRating(user.is_rated));
+                      }
+                    }}
+                    className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
+                  >
+                    {user.is_rated ? 'Edit Rating' : 'Rate User'}
+                  </button>
+                )}
                 
-                {/* Wage Button - Only show if user is rated */}
-                {user.is_rated && (
+                {/* Wage Button - For everyone, but boys need rating first */}
+                {(user.type !== 'boys' || user.is_rated) && (
                   <button
                     onClick={() => {
                       setSelectedUserForWage(user);
@@ -983,7 +1110,7 @@ const WageFormModal = ({
                       setIsWageEditMode(!!user.wage_id);
                       setEditingWageId(user.wage_id || null);
                     }}
-                    className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700"
+                    className={`${user.type === 'boys' ? 'flex-1' : 'w-full'} bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700`}
                   >
                     {user.wage_id ? 'Edit Wage' : 'Add Wage'}
                   </button>
@@ -998,6 +1125,7 @@ const WageFormModal = ({
   </div>
 )}
 
+{/* FIXED Rating Modal */}
 {showRatingModal && selectedUserForRating && selectedWorkForUsers && (
   <RatingModal
     user={selectedUserForRating}
@@ -1021,12 +1149,15 @@ const WageFormModal = ({
       setSelectedUserForRating(null);
       setIsEditMode(false);
       setEditingRatingId(null);
+      // Refresh assigned users data
+      dispatch(getAssignedUsers(selectedWorkForUsers.id));
     }}
     initialData={isEditMode && boyRating.data ? boyRating.data : {}}
     isEditMode={isEditMode}
   />
 )}
 
+{/* FIXED Wage Modal */}
 {showWageModal && selectedUserForWage && selectedWorkForUsers && (
   <WageFormModal
     user={selectedUserForWage}
@@ -1038,21 +1169,53 @@ const WageFormModal = ({
       setEditingWageId(null);
     }}
     onSubmit={(wageData) => {
-      if (isWageEditMode && editingWageId) {
-        dispatch(updateBoyWage({ 
-          wageId: editingWageId, 
-          wageData 
-        }));
+      if (selectedUserForWage.type === 'boys') {
+        // Use existing boy wage API
+        if (isWageEditMode && editingWageId) {
+          dispatch(submitBoyWage({ 
+            wageId: editingWageId, 
+            wageData 
+          }));
+        } else {
+          dispatch(submitBoyWage(wageData));
+        }
       } else {
-        dispatch(submitBoyWage(wageData));
+        // Use new API for subadmin/supervisor wage
+        if (isWageEditMode && editingWageId) {
+          dispatch(updateSubAdminSupervisorWage({ 
+            wageId: editingWageId, 
+            wageData 
+          }));
+        } else {
+          dispatch(submitSubAdminSupervisorWage(wageData));
+        }
       }
       setShowWageModal(false);
       setSelectedUserForWage(null);
       setIsWageEditMode(false);
       setEditingWageId(null);
+      // Refresh assigned users data
+      dispatch(getAssignedUsers(selectedWorkForUsers.id));
     }}
     initialData={isWageEditMode ? {} : {}}
     isEditMode={isWageEditMode}
+  />
+)}
+
+{/* FIXED Expense Modal */}
+{showExpenseModal && selectedWorkForExpense && (
+  <ExpenseModal
+    work={selectedWorkForExpense}
+    onClose={() => {
+      setShowExpenseModal(false);
+      setSelectedWorkForExpense(null);
+    }}
+    onSubmit={(expenseData) => {
+      dispatch(addExtraExpense(expenseData));
+      setShowExpenseModal(false);
+      setSelectedWorkForExpense(null);
+    }}
+    initialData={{}}
   />
 )}
     </div>

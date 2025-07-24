@@ -93,8 +93,8 @@ const AdminLogin = () => {
               <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-800 rounded-lg mb-4">
                 <span className="text-white font-bold text-xl">CK</span>
               </div>
-              <h1 className="text-2xl font-bold text-gray-800 mb-2">CaterKart</h1>
-              <p className="text-gray-600 text-sm">Admin Panel</p>
+              <h1 className="text-4xl font-bold text-gray-800 mb-2">CaterKart</h1>
+              <p className="text-gray-600 text-xl">Admin Panel</p>
             </div>
 
             {/* Error Message */}
