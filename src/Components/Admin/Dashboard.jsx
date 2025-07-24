@@ -183,16 +183,16 @@ const Dashboard = () => {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-gray-600">
+                        <Calendar className="w-6 h-6 text-gray-500" />
+                        <span className="text-xm font-semibold text-green-600">{formatDate(work.date)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-gray-600">
                         <MapPin className="w-4 h-4 text-gray-500" />
                         <span className="text-sm font-semibold text-gray-800">{work.place}</span>
                       </div>
                       <div className="flex items-center gap-2 text-gray-600">
                         <Users className="w-4 h-4 text-gray-500" />
                         <span className="text-sm">{work.no_of_boys_needed} staff needed</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <Calendar className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm font-semibold text-green-600">{formatDate(work.date)}</span>
                       </div>
                       <div className="flex items-center gap-2 text-gray-600">
                         <Clock className="w-4 h-4 text-gray-500" />

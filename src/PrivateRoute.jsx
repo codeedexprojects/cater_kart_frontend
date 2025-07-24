@@ -15,14 +15,34 @@ const LoadingSpinner = () => (
 export const AdminRoute = () => {
   const adminAuth = useSelector((state) => state.adminAuth);
   
+  // Add a small delay to prevent immediate redirects during state transitions
+  const [initialLoading, setInitialLoading] = React.useState(true);
+  
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitialLoading(false);
+    }, 100); // Small delay to let state settle
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
   // Memoize the auth state to prevent excessive re-renders
   const authState = useMemo(() => {
+    if (initialLoading) {
+      return { shouldRedirect: false, shouldShowLoading: true };
+    }
+    
     if (!adminAuth) {
       return { shouldRedirect: true, shouldShowLoading: false };
     }
     
-    // If we have a token but isLoggedIn is still undefined, show loading
-    if (adminAuth.token && adminAuth.isLoggedIn === undefined) {
+    // If we have a token but isLoggedIn is still undefined/null, show loading
+    if (adminAuth.tokens && adminAuth.isLoggedIn !== true && adminAuth.isLoggedIn !== false) {
+      return { shouldRedirect: false, shouldShowLoading: true };
+    }
+    
+    // If we're in a loading state from async operations
+    if (adminAuth.isLoading) {
       return { shouldRedirect: false, shouldShowLoading: true };
     }
     
@@ -30,7 +50,7 @@ export const AdminRoute = () => {
       shouldRedirect: !adminAuth.isLoggedIn, 
       shouldShowLoading: false 
     };
-  }, [adminAuth?.isLoggedIn, adminAuth?.token]);
+  }, [adminAuth?.isLoggedIn, adminAuth?.tokens, adminAuth?.isLoading, initialLoading]);
   
   if (authState.shouldShowLoading) {
     return <LoadingSpinner />;
@@ -46,14 +66,34 @@ export const AdminRoute = () => {
 export const SubAdminRoute = () => {
   const subAdminAuth = useSelector((state) => state.subAdminAuth);
   
+  // Add a small delay to prevent immediate redirects during state transitions
+  const [initialLoading, setInitialLoading] = React.useState(true);
+  
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitialLoading(false);
+    }, 100); // Small delay to let state settle
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
   // Memoize the auth state to prevent excessive re-renders
   const authState = useMemo(() => {
+    if (initialLoading) {
+      return { shouldRedirect: false, shouldShowLoading: true };
+    }
+    
     if (!subAdminAuth) {
       return { shouldRedirect: true, shouldShowLoading: false };
     }
     
-    // If we have a token but isLoggedIn is still undefined, show loading
-    if (subAdminAuth.token && subAdminAuth.isLoggedIn === undefined) {
+    // If we have a token but isLoggedIn is still undefined/null, show loading
+    if (subAdminAuth.tokens && subAdminAuth.isLoggedIn !== true && subAdminAuth.isLoggedIn !== false) {
+      return { shouldRedirect: false, shouldShowLoading: true };
+    }
+    
+    // If we're in a loading state from async operations
+    if (subAdminAuth.isLoading) {
       return { shouldRedirect: false, shouldShowLoading: true };
     }
     
@@ -61,7 +101,7 @@ export const SubAdminRoute = () => {
       shouldRedirect: !subAdminAuth.isLoggedIn, 
       shouldShowLoading: false 
     };
-  }, [subAdminAuth?.isLoggedIn, subAdminAuth?.token]);
+  }, [subAdminAuth?.isLoggedIn, subAdminAuth?.tokens, subAdminAuth?.isLoading, initialLoading]);
   
   if (authState.shouldShowLoading) {
     return <LoadingSpinner />;
@@ -77,16 +117,36 @@ export const SubAdminRoute = () => {
 export const UserRoute = () => {
   const userAuth = useSelector((state) => state.userAuth);
   
+  // Add a small delay to prevent immediate redirects during state transitions
+  const [initialLoading, setInitialLoading] = React.useState(true);
+  
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setInitialLoading(false);
+    }, 100); // Small delay to let state settle
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
   // Memoize the auth state to prevent excessive re-renders
   const authState = useMemo(() => {
+    if (initialLoading) {
+      return { shouldRedirect: false, shouldShowLoading: true };
+    }
+    
     if (!userAuth) {
       console.log('UserAuth state not found, redirecting to login');
       return { shouldRedirect: true, shouldShowLoading: false };
     }
     
-    // If we have a token but isLoggedIn is still undefined, show loading
-    if (userAuth.token && userAuth.isLoggedIn === undefined) {
+    // If we have a token but isLoggedIn is still undefined/null, show loading
+    if (userAuth.token && userAuth.isLoggedIn !== true && userAuth.isLoggedIn !== false) {
       console.log('User auth still loading...');
+      return { shouldRedirect: false, shouldShowLoading: true };
+    }
+    
+    // If we're in a loading state from async operations
+    if (userAuth.isLoading) {
       return { shouldRedirect: false, shouldShowLoading: true };
     }
     
@@ -101,7 +161,7 @@ export const UserRoute = () => {
       shouldRedirect: !userAuth.isLoggedIn, 
       shouldShowLoading: false 
     };
-  }, [userAuth?.isLoggedIn, userAuth?.token, userAuth?.user]);
+  }, [userAuth?.isLoggedIn, userAuth?.token, userAuth?.user, userAuth?.isLoading, initialLoading]);
   
   if (authState.shouldShowLoading) {
     return <LoadingSpinner />;
@@ -125,7 +185,7 @@ export const ProtectedRoute = ({ children, userType }) => {
       case 'admin':
         return '/admin/login';
       case 'subadmin':
-        return '/subadmin/login';
+        return '/subadmin/login';  
       case 'user':
         return '/user/login';
       default:
@@ -155,9 +215,15 @@ export const ProtectedRoute = ({ children, userType }) => {
       return { shouldRedirect: true, shouldShowLoading: false };
     }
     
-    // If we have a token but isLoggedIn is still undefined, show loading
-    if (authState.token && authState.isLoggedIn === undefined) {
+    // If we have a token/tokens but isLoggedIn is still undefined/null, show loading
+    const hasTokens = authState.token || authState.tokens;
+    if (hasTokens && authState.isLoggedIn !== true && authState.isLoggedIn !== false) {
       console.log(`${userType} auth still loading...`);
+      return { shouldRedirect: false, shouldShowLoading: true };
+    }
+    
+    // If we're in a loading state from async operations
+    if (authState.isLoading) {
       return { shouldRedirect: false, shouldShowLoading: true };
     }
     
@@ -166,7 +232,7 @@ export const ProtectedRoute = ({ children, userType }) => {
       shouldRedirect: !authState.isLoggedIn, 
       shouldShowLoading: false 
     };
-  }, [authState?.isLoggedIn, authState?.token, userType]);
+  }, [authState?.isLoggedIn, authState?.token, authState?.tokens, authState?.isLoading, userType]);
   
   if (protectionState.shouldShowLoading) {
     return <LoadingSpinner />;

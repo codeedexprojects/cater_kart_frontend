@@ -1,22 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, User, Lock, ArrowRight, AlertCircle } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
-import { subAdminLogin } from '../../Services/Api/SubAdmin/SubLoginSlice';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { subAdminLogin, clearAuthError } from '../../Services/Api/SubAdmin/SubLoginSlice';
+import { useNavigate } from 'react-router-dom';
 
 const SubAdminLogin = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { isLoading, isLoggedIn, error } = useSelector((state) => state.subAdminAuth);
 
-  // Redirect if already logged in
-  if (isLoggedIn) return <Navigate to="/subadmin/sub-dashboard" replace />;
-
   const [formData, setFormData] = useState({
     identifier: '',
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
+
+  // Handle navigation after successful login
+  useEffect(() => {
+    if (isLoggedIn) {
+      // Add a small delay to ensure state is fully updated
+      const timer = setTimeout(() => {
+        navigate('/subadmin/sub-dashboard', { replace: true });
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isLoggedIn, navigate]);
+
+  // Clear errors when component mounts or unmounts
+  useEffect(() => {
+    dispatch(clearAuthError());
+    
+    return () => {
+      dispatch(clearAuthError());
+    };
+  }, [dispatch]);
+
+  // If already logged in, redirect immediately
+  useEffect(() => {
+    if (isLoggedIn) {
+      navigate('/subadmin/sub-dashboard', { replace: true });
+    }
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -28,15 +53,36 @@ const SubAdminLogin = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Clear any existing errors
+    dispatch(clearAuthError());
+    
     try {
-      const result = await dispatch(subAdminLogin(formData)).unwrap();
-      console.log('Login successful:', result);
-      // Navigate to dashboard after successful login
-      navigate('/subadmin/sub-dashboard');
+      const result = await dispatch(subAdminLogin(formData));
+      
+      // Check if login was successful
+      if (subAdminLogin.fulfilled.match(result)) {
+        console.log('Login successful:', result.payload);
+        // Navigation will be handled by useEffect above
+      } else {
+        console.error('Login failed:', result.payload);
+      }
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('Login error:', error);
     }
   };
+
+  // Show loading spinner if already logged in and navigating
+  if (isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white">Redirecting to dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
@@ -76,7 +122,8 @@ const SubAdminLogin = () => {
                     value={formData.identifier}
                     onChange={handleInputChange}
                     required
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition-all duration-200"
+                    disabled={isLoading}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="Enter your Phone Number or Email"
                   />
                 </div>
@@ -95,13 +142,15 @@ const SubAdminLogin = () => {
                     value={formData.password}
                     onChange={handleInputChange}
                     required
-                    className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition-all duration-200"
+                    disabled={isLoading}
+                    className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-800 focus:border-transparent transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="Enter your password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    disabled={isLoading}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center disabled:opacity-50"
                   >
                     {showPassword ? (
                       <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors" />
@@ -119,7 +168,10 @@ const SubAdminLogin = () => {
                 className="w-full bg-gray-800 hover:bg-gray-900 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-800 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center group"
               >
                 {isLoading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <div className="flex items-center">
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                    Signing in...
+                  </div>
                 ) : (
                   <>
                     Sign In

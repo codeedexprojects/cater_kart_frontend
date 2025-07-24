@@ -198,6 +198,10 @@ const SubAdminDashboard = () => {
                   </div>
 
                   <div className="space-y-2 mb-4">
+                    <div className="flex items-center text-xm text-red-600">
+                      <Calendar className="h-6 w-6 mr-2" />
+                      {formatDate(work.date)}
+                    </div>
                     <div className="flex items-center text-sm text-gray-600">
                       <MapPin className="h-4 w-4 mr-2" />
                       {work.place}
@@ -205,10 +209,6 @@ const SubAdminDashboard = () => {
                     <div className="flex items-center text-sm text-gray-600">
                       <Building2 className="h-4 w-4 mr-2" />
                       {work.Auditorium_name}
-                    </div>
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      {formatDate(work.date)}
                     </div>
                     <div className="flex items-center text-sm text-gray-600">
                       <Timer className="h-4 w-4 mr-2" />
