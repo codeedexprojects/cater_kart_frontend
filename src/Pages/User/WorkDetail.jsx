@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { MapPin, Clock, Users, Calendar, ChefHat, ArrowLeft, Phone, CheckCircle, User, Shirt, Truck, Settings, Star, DollarSign, UserCheck } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -9,47 +9,53 @@ import { fetchWorkById, requestWork, clearCurrentWork } from '../../Services/Api
 import ConfirmationModal from '../../Components/Users/ConfirnationModal';
 
 const CateringStaffJobDetails = () => {
-  const [isApplied, setIsApplied] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const rawId = useParams().id;
-  const id = rawId?.startsWith('$') ? rawId.slice(1) : rawId;
-  const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { id } = useParams();
+  const navigate = useNavigate();
 
-  // Redux state
-  const { 
-    currentWork: jobDetails, 
-    isLoading: loading, 
-    error 
+  // Redux state selectors
+  const {
+    currentWork: jobDetails,
+    loadingStates,
+    error,
+    isLoggedIn
   } = useSelector((state) => state.userAuth);
 
+  // Local state for modal and submission
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  // Derived state
+  const loading = loadingStates.currentWork;
+  const isApplied = jobDetails?.join_requests && jobDetails.join_requests.length > 0;
+
   useEffect(() => {
-    const fetchJobDetails = async () => {
-      try {
-        const result = await dispatch(fetchWorkById(id)).unwrap();
-        
-        // Check if user has already requested this work
-        const hasUserRequested = result.join_requests && result.join_requests.length > 0;
-        setIsApplied(hasUserRequested);
+    // Clear previous work details when component mounts
+    dispatch(clearCurrentWork());
+    
+    // Fetch job details if user is logged in
+    if (isLoggedIn && id) {
+      dispatch(fetchWorkById(id));
+    }
+  }, [dispatch, id, isLoggedIn]);
 
-      } catch (err) {
-        console.error('Failed to fetch job details:', err);
-        toast.error('Failed to load job details. Please try again.');
-      }
-    };
+  // Handle errors from Redux
+  useEffect(() => {
+    if (error && !loading) {
+      toast.error(error);
+    }
+  }, [error, loading]);
 
-    fetchJobDetails();
-
-    // Cleanup function to clear current work when component unmounts
-    return () => {
-      dispatch(clearCurrentWork());
-    };
-  }, [id, dispatch]);
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!isLoggedIn) {
+      navigate('/login');
+    }
+  }, [isLoggedIn, navigate]);
 
   const handleBackClick = () => {
     navigate(-1);
-  }
+  };
 
   const handleRequestWork = () => {
     setIsModalOpen(true);
@@ -64,21 +70,28 @@ const CateringStaffJobDetails = () => {
         work: parseInt(id)
       };
 
-      await dispatch(requestWork(requestBody)).unwrap();
+      const resultAction = await dispatch(requestWork(requestBody));
       
-      setIsApplied(true);
-      setIsModalOpen(false);
-      toast.success('Work request sent successfully!', {
-        id: loadingToast,
-        duration: 4000,
-      });
-      
-      // Refresh the job details to get updated join_requests
-      dispatch(fetchWorkById(id));
-      
+      if (requestWork.fulfilled.match(resultAction)) {
+        setIsModalOpen(false);
+        toast.success('Work request sent successfully!', {
+          id: loadingToast,
+          duration: 4000,
+        });
+        
+        // Refresh the job details to show updated status
+        dispatch(fetchWorkById(id));
+      } else {
+        // Handle rejection
+        const errorMessage = resultAction.payload || 'Failed to send work request. Please try again.';
+        toast.error(errorMessage, {
+          id: loadingToast,
+          duration: 4000,
+        });
+      }
     } catch (error) {
       console.error('Error requesting work:', error);
-      toast.error(error || 'Failed to send work request. Please try again.', {
+      toast.error('Failed to send work request. Please try again.', {
         id: loadingToast,
         duration: 4000,
       });
@@ -104,6 +117,7 @@ const CateringStaffJobDetails = () => {
   };
 
   const formatInstructions = (instructions) => {
+    if (!instructions) return [];
     const lines = instructions.split('\n').filter(item => item.trim() !== '');
     return lines.map(line => ({
       text: line.replace('*', '').trim(),
@@ -112,7 +126,7 @@ const CateringStaffJobDetails = () => {
   };
 
   const getRequestStatus = () => {
-    if (!jobDetails.join_requests || jobDetails.join_requests.length === 0) {
+    if (!jobDetails?.join_requests || jobDetails.join_requests.length === 0) {
       return null;
     }
 
@@ -179,48 +193,55 @@ const CateringStaffJobDetails = () => {
   };
 
   // Loading state
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-red-50">
-      <div className="text-center">
-        <div className="inline-block relative">
-          <div className="w-16 h-16 border-4 border-orange-200 rounded-full"></div>
-          <div className="absolute top-0 left-0 w-16 h-16 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-red-50">
+        <div className="text-center">
+          <div className="inline-block relative">
+            <div className="w-16 h-16 border-4 border-orange-200 rounded-full"></div>
+            <div className="absolute top-0 left-0 w-16 h-16 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <p className="mt-4 text-lg font-medium text-gray-700">Loading job details...</p>
+          <p className="mt-1 text-sm text-gray-500">Please wait while we fetch the information</p>
         </div>
-        <p className="mt-4 text-lg font-medium text-gray-700">Loading job details...</p>
-        <p className="mt-1 text-sm text-gray-500">Please wait while we fetch the information</p>
       </div>
-    </div>
-  );
-  
+    );
+  }
+
   // Error state
-  if (error) return (
-    <div className="min-h-screen flex items-center justify-center text-red-500">
-      <div className="text-center">
-        <p className="text-lg font-medium">{error}</p>
-        <button 
-          onClick={() => dispatch(fetchWorkById(id))}
-          className="mt-4 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
-        >
-          Retry
-        </button>
+  if (error && !jobDetails) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-red-500">
+        <div className="text-center">
+          <p className="text-lg font-medium">Error loading job details</p>
+          <p className="text-sm mt-2">{error}</p>
+          <button 
+            onClick={() => dispatch(fetchWorkById(id))}
+            className="mt-4 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+          >
+            Retry
+          </button>
+        </div>
       </div>
-    </div>
-  );
-  
+    );
+  }
+
   // No data state
-  if (!jobDetails) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <p className="text-lg font-medium">No job details found</p>
-        <button 
-          onClick={() => navigate(-1)}
-          className="mt-4 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
-        >
-          Go Back
-        </button>
+  if (!jobDetails) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg font-medium text-gray-700">No job details found</p>
+          <button 
+            onClick={() => navigate(-1)}
+            className="mt-4 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+          >
+            Go Back
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   const requestStatus = getRequestStatus();
   const hasExtraWork = jobDetails.join_requests && jobDetails.join_requests.length > 0 && jobDetails.join_requests[0].extra_work;
@@ -230,7 +251,7 @@ const CateringStaffJobDetails = () => {
 
   return (
     <div>
-      <Header></Header>
+      <Header />
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50">
         {/* Header */}
         <div className="bg-gradient-to-r from-orange-600 to-red-600 text-white p-6">
@@ -241,7 +262,7 @@ const CateringStaffJobDetails = () => {
               </button>
               <div>
                 <h1 className="text-2xl font-bold">{jobDetails.Auditorium_name} - {jobDetails.date}</h1>
-                <p className="text-orange-100">{jobDetails.work_type.replace(/_/g, ' ')} Event</p>
+                <p className="text-orange-100">{jobDetails.work_type?.replace(/_/g, ' ')} Event</p>
               </div>
             </div>
           </div>
@@ -293,14 +314,16 @@ const CateringStaffJobDetails = () => {
                   <div>
                     <div className="font-semibold text-gray-800">{jobDetails.Auditorium_name}</div>
                     <div className="text-gray-600">{jobDetails.place}</div>
-                    <a
-                      href={jobDetails.location_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 text-sm mt-1 inline-block hover:underline"
-                    >
-                      View on Map
-                    </a>
+                    {jobDetails.location_url && (
+                      <a
+                        href={jobDetails.location_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 text-sm mt-1 inline-block hover:underline"
+                      >
+                        View on Map
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
@@ -444,16 +467,18 @@ const CateringStaffJobDetails = () => {
                     </span>
                   </div>
 
-                  <div className="mt-4 p-3 bg-green-50 rounded-lg">
-                    <div className="text-center">
-                      <div className="text-sm text-green-700">Total Earning</div>
-                      <div className="text-2xl font-bold text-green-600">₹{jobDetails.total_earning.toFixed(2)}</div>
+                  {jobDetails.total_earning && (
+                    <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                      <div className="text-center">
+                        <div className="text-sm text-green-700">Total Earning</div>
+                        <div className="text-2xl font-bold text-green-600">₹{jobDetails.total_earning.toFixed(2)}</div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
 
-              {/* Assigned Supervisors */}
+              {/* Contact Information */}
               <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
                 <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                   <User className="w-5 h-5 text-orange-600" />
@@ -522,11 +547,10 @@ const CateringStaffJobDetails = () => {
                   </div>
                 </div>
               </div>
-
             </div>
           </div>
         </div>
-        <Footer></Footer>
+        <Footer />
 
         {/* Toast Container */}
         <Toaster

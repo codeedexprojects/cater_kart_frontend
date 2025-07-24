@@ -1,6 +1,12 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 
+const CACHE_DURATION = 5 * 60 * 1000;
+
+const shouldFetch = (lastFetchTime) => {
+  return Date.now() - lastFetchTime > CACHE_DURATION;
+};
+
 const API_BASE_URL = 'https://catershub.pythonanywhere.com';
 
 // LocalStorage Helpers
@@ -50,6 +56,23 @@ const initialState = {
   currentWork: null,
   myWorks: [],
   userCounts: null,
+  // Add caching timestamps
+  lastFetch: {
+    profile: 0,
+    workList: 0,
+    myWorks: 0,
+    userCounts: 0,
+    currentWork: {}
+  },
+  // Add loading states for individual operations
+  loadingStates: {
+    profile: false,
+    workList: false,
+    myWorks: false,
+    userCounts: false,
+    currentWork: false,
+    updateProfile: false
+  }
 };
 
 // Enhanced error handler
@@ -110,7 +133,10 @@ export const updateUserProfile = createAsyncThunk(
       }
       
       const { data } = await axios.patch(`${API_BASE_URL}/users/update/users-details/`, profileData, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
       });
       return data;
     } catch (error) {
@@ -231,6 +257,21 @@ const userAuthSlice = createSlice({
         currentWork: null,
         myWorks: [],
         userCounts: null,
+        lastFetch: {
+          profile: 0,
+          workList: 0,
+          myWorks: 0,
+          userCounts: 0,
+          currentWork: {}
+        },
+        loadingStates: {
+          profile: false,
+          workList: false,
+          myWorks: false,
+          userCounts: false,
+          currentWork: false,
+          updateProfile: false
+        }
       });
       localStorage.removeItem('access_token');
       localStorage.removeItem('user');
@@ -249,6 +290,21 @@ const userAuthSlice = createSlice({
     clearCurrentWork: (state) => {
       state.currentWork = null;
     },
+    setLoadingState: (state, action) => {
+      const { operation, isLoading } = action.payload;
+      state.loadingStates[operation] = isLoading;
+    },
+    
+    updateLastFetch: (state, action) => {
+      const { operation, timestamp } = action.payload;
+      state.lastFetch[operation] = timestamp || Date.now();
+    },
+    
+    // Add a generic cache checker
+    checkCache: (state, action) => {
+      const { operation } = action.payload;
+      return shouldFetch(state.lastFetch[operation]);
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -276,16 +332,17 @@ const userAuthSlice = createSlice({
 
       // Fetch Profile
       .addCase(fetchProfile.pending, (state) => {
-        state.isLoading = true;
+        state.loadingStates.profile = true;
+        state.error = null;
       })
       .addCase(fetchProfile.fulfilled, (state, action) => {
-        state.isLoading = false;
+        state.loadingStates.profile = false;
         state.profile = action.payload;
+        state.lastFetch.profile = Date.now();
       })
       .addCase(fetchProfile.rejected, (state, action) => {
-        state.isLoading = false;
+        state.loadingStates.profile = false;
         state.error = action.payload;
-        // Auto logout on auth error
         if (action.payload?.includes('Session expired')) {
           state.user = null;
           state.token = null;
@@ -294,55 +351,105 @@ const userAuthSlice = createSlice({
       })
 
       // Update Profile
-      .addCase(updateUserProfile.fulfilled, (state, action) => {
-        state.profile = action.payload;
-        state.user = { ...state.user, ...action.payload };
-        localStorage.setItem('user', JSON.stringify(state.user));
+      .addCase(updateUserProfile.pending, (state) => {
+        state.loadingStates.updateProfile = true;
+        state.error = null;
       })
-
-      // Fetch Work List
+      .addCase(updateUserProfile.fulfilled, (state, action) => {
+        state.loadingStates.updateProfile = false;
+        // Update the profile data with the response
+        if (action.payload?.user) {
+          state.profile = {
+            ...state.profile,
+            user: {
+              ...state.profile?.user,
+              ...action.payload.user
+            }
+          };
+        }
+        // Update the lastFetch timestamp
+        state.lastFetch.profile = Date.now();
+      })
+      .addCase(updateUserProfile.rejected, (state, action) => {
+        state.loadingStates.updateProfile = false;
+        state.error = action.payload;
+        if (action.payload?.includes('Session expired')) {
+          state.user = null;
+          state.token = null;
+          state.isLoggedIn = false;
+        }
+      })
+      
+      // Update fetchWorkList cases
       .addCase(fetchWorkList.pending, (state) => {
-        state.isLoading = true;
+        state.loadingStates.workList = true;
+        state.error = null;
       })
       .addCase(fetchWorkList.fulfilled, (state, action) => {
-        state.isLoading = false;
+        state.loadingStates.workList = false;
         state.workList = action.payload;
+        state.lastFetch.workList = Date.now();
       })
       .addCase(fetchWorkList.rejected, (state, action) => {
-        state.isLoading = false;
+        state.loadingStates.workList = false;
         state.error = action.payload;
       })
-
-      // Fetch Work By ID
-      .addCase(fetchWorkById.fulfilled, (state, action) => {
-        state.currentWork = action.payload;
+      
+      // Update fetchMyWorks cases
+      .addCase(fetchMyWorks.pending, (state) => {
+        state.loadingStates.myWorks = true;
+        state.error = null;
       })
-
-      // Fetch My Works
       .addCase(fetchMyWorks.fulfilled, (state, action) => {
+        state.loadingStates.myWorks = false;
         state.myWorks = action.payload;
+        state.lastFetch.myWorks = Date.now();
       })
-
-      // Fetch User Counts
+      .addCase(fetchMyWorks.rejected, (state, action) => {
+        state.loadingStates.myWorks = false;
+        state.error = action.payload;
+      })
+      
+      // Update fetchWorkById cases
+      .addCase(fetchWorkById.pending, (state) => {
+        state.loadingStates.currentWork = true;
+        state.error = null;
+      })
+      .addCase(fetchWorkById.fulfilled, (state, action) => {
+        state.loadingStates.currentWork = false;
+        state.currentWork = action.payload;
+        if (action.payload?.id) {
+          state.lastFetch.currentWork[action.payload.id] = Date.now();
+        }
+      })
+      .addCase(fetchWorkById.rejected, (state, action) => {
+        state.loadingStates.currentWork = false;
+        state.error = action.payload;
+      })
+      
+      // Update fetchUserCounts cases
       .addCase(fetchUserCounts.pending, (state) => {
-        state.isLoading = true;
+        state.loadingStates.userCounts = true;
+        state.error = null;
       })
       .addCase(fetchUserCounts.fulfilled, (state, action) => {
-        state.isLoading = false;
+        state.loadingStates.userCounts = false;
         state.userCounts = action.payload;
+        state.lastFetch.userCounts = Date.now();
       })
       .addCase(fetchUserCounts.rejected, (state, action) => {
-        state.isLoading = false;
+        state.loadingStates.userCounts = false;
         state.error = action.payload;
       })
-
-      // Request Work
+      
+      // Request Work cases
       .addCase(requestWork.pending, (state) => {
         state.isLoading = true;
+        state.error = null;
       })
       .addCase(requestWork.fulfilled, (state, action) => {
         state.isLoading = false;
-        // Optionally update local state or refresh data
+        // Optionally update myWorks or trigger a refetch
       })
       .addCase(requestWork.rejected, (state, action) => {
         state.isLoading = false;
@@ -351,5 +458,14 @@ const userAuthSlice = createSlice({
   },
 });
 
-export const { logoutUser, setAuthState, clearAuthError, clearCurrentWork } = userAuthSlice.actions;
+export const { 
+  logoutUser, 
+  setAuthState, 
+  clearAuthError, 
+  clearCurrentWork,
+  setLoadingState,
+  updateLastFetch,
+  checkCache
+} = userAuthSlice.actions;
+
 export default userAuthSlice.reducer;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   Clock, CheckCircle, XCircle, AlertCircle, Calendar, MapPin, Filter, Search, Eye, ChefHat, MoreHorizontal,
@@ -12,27 +12,52 @@ const MyWorksPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   
-  // Redux state
-  const { myWorks: workData, isLoading: loading, error } = useSelector((state) => state.userAuth);
+  // Redux state - Fixed to use loadingStates
+  const { 
+    myWorks: workData, 
+    loadingStates, 
+    error 
+  } = useSelector((state) => state.userAuth);
+  
+  const loading = loadingStates?.myWorks || false;
   
   // Local state
   const [activeTab, setActiveTab] = useState('active');
   const [selectedWork, setSelectedWork] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [lastFetchTime, setLastFetchTime] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
 
-  // Fetch works data on component mount
+  // Memoized fetch function to prevent unnecessary re-renders
+  const fetchWorks = useCallback(async () => {
+    if (isRefreshing || loading) return;
+    
+    try {
+      await dispatch(fetchMyWorks()).unwrap();
+      setLastFetchTime(Date.now());
+      setHasFetched(true);
+    } catch (error) {
+      console.error('Failed to fetch works:', error);
+    }
+  }, [dispatch, isRefreshing, loading]);
+
   useEffect(() => {
-    dispatch(fetchMyWorks());
-  }, [dispatch]);
+    const now = Date.now();
+    // Only fetch if we don't have data or it's been more than 5 minutes since last fetch
+    if (!hasFetched || (!workData || workData.length === 0) || (now - lastFetchTime > 5 * 60 * 1000)) {
+      fetchWorks();
+    }
+  }, [fetchWorks, workData, lastFetchTime, hasFetched]);
 
-  const handleViewDetails = (workDetailId) => {
-    console.log(workDetailId)
+  const handleViewDetails = useCallback((workDetailId) => {
+    console.log(workDetailId);
     navigate(`/work-details/${workDetailId}`);
-  };
+  }, [navigate]);
 
-  // Group works by status
-  const getWorksByStatus = () => {
+  // Memoized function to group works by status
+  const worksByStatus = useMemo(() => {
     if (!Array.isArray(workData)) {
       return {
         pending: [],
@@ -51,29 +76,28 @@ const MyWorksPage = () => {
       accepted: [],
       rejected: []
     });
-  };
+  }, [workData]);
 
-  const worksByStatus = getWorksByStatus();
-
-  const getStatusColor = (status) => {
+  const getStatusColor = useCallback((status) => {
     const colors = {
       pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
       accepted: 'bg-green-100 text-green-800 border-green-200',
       rejected: 'bg-red-100 text-red-800 border-red-200'
     };
     return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200';
-  };
+  }, []);
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = useCallback((status) => {
     const icons = {
       pending: AlertCircle,
       accepted: CheckCircle,
       rejected: XCircle
     };
     return icons[status] || AlertCircle;
-  };
+  }, []);
 
-  const tabs = [
+  // Memoized tabs data
+  const tabs = useMemo(() => [
     {
       id: 'active',
       label: 'Active',
@@ -82,9 +106,9 @@ const MyWorksPage = () => {
     { id: 'pending', label: 'Pending', count: worksByStatus.pending.length },
     { id: 'accepted', label: 'Accepted', count: worksByStatus.accepted.length },
     { id: 'rejected', label: 'Rejected', count: worksByStatus.rejected.length }
-  ];
+  ], [worksByStatus]);
 
-  const getWorksForTab = (tabId) => {
+  const getWorksForTab = useCallback((tabId) => {
     switch (tabId) {
       case 'active':
         return [...worksByStatus.pending, ...worksByStatus.accepted];
@@ -97,18 +121,18 @@ const MyWorksPage = () => {
       default:
         return Array.isArray(workData) ? workData : [];
     }
-  };
+  }, [worksByStatus, workData]);
 
-  const formatTime = (timeString) => {
+  const formatTime = useCallback((timeString) => {
     if (!timeString) return 'N/A';
     const [hours, minutes] = timeString.split(':');
     const hour = parseInt(hours);
     const ampm = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour % 12 || 12;
     return `${displayHour}:${minutes} ${ampm}`;
-  };
+  }, []);
 
-  const formatDate = (dateString) => {
+  const formatDate = useCallback((dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -116,9 +140,10 @@ const MyWorksPage = () => {
       month: 'long',
       day: 'numeric'
     });
-  };
+  }, []);
 
-  const WorkCard = ({ work }) => {
+  // Memoized WorkCard component
+  const WorkCard = React.memo(({ work }) => {
     const StatusIcon = getStatusIcon(work.status);
     const workDetail = work.work_detail;
 
@@ -128,7 +153,7 @@ const MyWorksPage = () => {
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
               <h3 className="text-lg font-bold text-gray-800">
-                {workDetail?.date} -  {workDetail?.Auditorium_name}
+                {workDetail?.date} - {workDetail?.Auditorium_name}
               </h3>
               <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(work.status)}`}>
                 <StatusIcon className="w-3 h-3 inline mr-1" />
@@ -136,12 +161,10 @@ const MyWorksPage = () => {
               </span>
             </div>
             <p className="text-gray-600 font-medium">
-              {workDetail?.Auditorium_name || workDetail?.Catering_company || 'Event Service'}
+              {workDetail?.Catering_company || 'Event Service'}
             </p>
-
           </div>
           <div className="text-right">
-
             {work.assigned && (
               <div className="text-sm text-green-600 font-medium mt-1">✓ Assigned</div>
             )}
@@ -161,7 +184,6 @@ const MyWorksPage = () => {
             <Clock className="w-4 h-4 text-orange-500" />
             <span className="text-sm">{formatTime(workDetail?.reporting_time)}</span>
           </div>
-
         </div>
 
         {/* Comment section */}
@@ -196,21 +218,36 @@ const MyWorksPage = () => {
         </div>
       </div>
     );
-  };
+  });
 
-  const currentWorks = getWorksForTab(activeTab);
-  const filteredWorks = currentWorks.filter(work =>
-    work.work_detail?.place?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    work.boy?.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    work.work_detail?.Auditorium_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    work.work_detail?.Catering_company?.toLowerCase().includes(searchTerm.toLowerCase())
+  // Memoized filtered works
+  const currentWorks = useMemo(() => getWorksForTab(activeTab), [getWorksForTab, activeTab]);
+  const filteredWorks = useMemo(() => 
+    currentWorks.filter(work =>
+      work.work_detail?.place?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      work.boy?.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      work.work_detail?.Auditorium_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      work.work_detail?.Catering_company?.toLowerCase().includes(searchTerm.toLowerCase())
+    ), [currentWorks, searchTerm]
   );
 
-  const handleRetry = () => {
-    dispatch(fetchMyWorks());
-  };
+  const handleRetry = useCallback(async () => {
+    if (isRefreshing) return; // Prevent multiple simultaneous calls
+    
+    setIsRefreshing(true);
+    try {
+      await dispatch(fetchMyWorks()).unwrap();
+      setLastFetchTime(Date.now());
+    } catch (error) {
+      console.error('Failed to refresh:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [dispatch, isRefreshing]);
 
-  if (loading) {
+  const totalWorks = useMemo(() => Array.isArray(workData) ? workData.length : 0, [workData]);
+
+  if (loading && !hasFetched) {
     return (
       <div>
         <Header />
@@ -230,7 +267,7 @@ const MyWorksPage = () => {
     );
   }
 
-  if (error) {
+  if (error && !workData) {
     return (
       <div>
         <Header />
@@ -241,9 +278,12 @@ const MyWorksPage = () => {
             <p className="text-gray-600 mb-4">{error}</p>
             <button
               onClick={handleRetry}
-              className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+              className={`px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors ${
+                isRefreshing ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              disabled={isRefreshing}
             >
-              Retry
+              {isRefreshing ? 'Retrying...' : 'Retry'}
             </button>
           </div>
         </div>
@@ -252,26 +292,11 @@ const MyWorksPage = () => {
     );
   }
 
-  const totalWorks = Array.isArray(workData) ? workData.length : 0;
-
   return (
     <div>
       <Header />
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4 flex items-center justify-between">
-              <span>{error}</span>
-              <button
-                onClick={handleRetry}
-                className="text-sm bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition-colors"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-
           {/* Header */}
           <div className="mb-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -292,10 +317,12 @@ const MyWorksPage = () => {
                 </div>
                 <button
                   onClick={handleRetry}
-                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2"
-                  disabled={loading}
+                  className={`px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2 ${
+                    isRefreshing ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                  disabled={isRefreshing}
                 >
-                  {loading ? (
+                  {isRefreshing ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   ) : (
                     'Refresh'
@@ -402,9 +429,12 @@ const MyWorksPage = () => {
                 {!searchTerm && totalWorks === 0 && (
                   <button
                     onClick={handleRetry}
-                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                    className={`px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors ${
+                      isRefreshing ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                    disabled={isRefreshing}
                   >
-                    Refresh Works
+                    {isRefreshing ? 'Refreshing...' : 'Refresh Works'}
                   </button>
                 )}
               </div>

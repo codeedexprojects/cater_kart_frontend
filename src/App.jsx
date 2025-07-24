@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-
+import { useParams } from 'react-router-dom';
 // Your existing Admin and SubAdmin components
 import AdminLogin from './Components/Admin/AdminLogin';
 import AdminHome from './Pages/Admin/AdminHome';
@@ -17,25 +17,34 @@ import CreateUser from './Components/SubAdmin/User';
 import CateringWorks from './Components/SubAdmin/CateringWorks';
 
 // User components (converted to use Redux)
-import Home from './Pages/User/Home'
+import Home from './Pages/User/Home';
 import Profile from './Pages/User/Profile';
 import MyWorksPage from './Pages/User/MyWork';
 import CateringJobDetails from './Pages/User/WorkDetail';
-import Login from './Pages/User/Login'
-import RedirectToUserWorkDetails from './RedirectToWorkDetail';
-import LandingPage from './LandingPage/Pages/Home'
+import Login from './Pages/User/Login';
+import LandingPage from './LandingPage/Pages/Home';
 
 // Unified protected routes
 import { AdminRoute, SubAdminRoute, UserRoute } from './PrivateRoute';
+
+// Redirect component for backward compatibility
+const RedirectToUserWorkDetails = () => {
+  const { id } = useParams();
+  return <Navigate to={`/user/work-details/${id}`} replace />;
+};
 
 const App = () => {
   return (
     <Router>
       <Routes>
-        {/* Public Routes */}
+        {/* Landing page - accessible to everyone */}
+        <Route path="/" element={<LandingPage />} />
+
+        {/* Public Login Routes */}
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/subadmin/login" element={<SubAdminLogin />} />
         <Route path="/user/login" element={<Login />} />
+        <Route path="/login" element={<Navigate to="/user/login" replace />} />
 
         {/* Admin Protected Routes */}
         <Route path="/admin" element={<AdminRoute />}>
@@ -68,29 +77,19 @@ const App = () => {
           <Route path="work-details/:id" element={<CateringJobDetails />} />
         </Route>
 
-        {/* Legacy user routes (for backward compatibility) */}
-        <Route path="/user" element={<Navigate to="/user/home" replace />} />
+        {/* Legacy routes for backward compatibility */}
         <Route path="/profile" element={<Navigate to="/user/profile" replace />} />
         <Route path="/my-works" element={<Navigate to="/user/my-works" replace />} />
         <Route path="/work-details/:id" element={<RedirectToUserWorkDetails />} />
-        <Route path="/login" element={<Navigate to="/user/login" replace />} />
 
-        {/* Default redirect - you can customize this logic */}
-        <Route 
-          path="/dashboard" 
-          element={<Navigate to="/admin/login" replace />} 
-        />
-        
+        {/* Default dashboard redirect */}
+        <Route path="/dashboard" element={<Navigate to="/admin/login" replace />} />
 
-        {/* Landing page - accessible to everyone */}
-        <Route path="/" element={<LandingPage />} />
-
-        {/* Catch-all route */}
-        <Route path="*" element={<Navigate to="/user/login" replace />} />
+        {/* Catch-all route - redirect to landing page instead of login */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
 };
-
 
 export default App;

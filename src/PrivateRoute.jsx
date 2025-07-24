@@ -1,27 +1,124 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 
+// Loading component
+const LoadingSpinner = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-600 mx-auto mb-4"></div>
+      <p className="text-gray-600">Loading...</p>
+    </div>
+  </div>
+);
+
 export const AdminRoute = () => {
-  const isLoggedIn = useSelector((state) => state.adminAuth.isLoggedIn);
-  return isLoggedIn ? <Outlet /> : <Navigate to="/admin/login" replace />;
+  const adminAuth = useSelector((state) => state.adminAuth);
+  
+  // Memoize the auth state to prevent excessive re-renders
+  const authState = useMemo(() => {
+    if (!adminAuth) {
+      return { shouldRedirect: true, shouldShowLoading: false };
+    }
+    
+    // If we have a token but isLoggedIn is still undefined, show loading
+    if (adminAuth.token && adminAuth.isLoggedIn === undefined) {
+      return { shouldRedirect: false, shouldShowLoading: true };
+    }
+    
+    return { 
+      shouldRedirect: !adminAuth.isLoggedIn, 
+      shouldShowLoading: false 
+    };
+  }, [adminAuth?.isLoggedIn, adminAuth?.token]);
+  
+  if (authState.shouldShowLoading) {
+    return <LoadingSpinner />;
+  }
+  
+  if (authState.shouldRedirect) {
+    return <Navigate to="/admin/login" replace />;
+  }
+  
+  return <Outlet />;
 };
 
 export const SubAdminRoute = () => {
-  const isLoggedIn = useSelector((state) => state.subAdminAuth.isLoggedIn);
-  return isLoggedIn ? <Outlet /> : <Navigate to="/subadmin/login" replace />;
+  const subAdminAuth = useSelector((state) => state.subAdminAuth);
+  
+  // Memoize the auth state to prevent excessive re-renders
+  const authState = useMemo(() => {
+    if (!subAdminAuth) {
+      return { shouldRedirect: true, shouldShowLoading: false };
+    }
+    
+    // If we have a token but isLoggedIn is still undefined, show loading
+    if (subAdminAuth.token && subAdminAuth.isLoggedIn === undefined) {
+      return { shouldRedirect: false, shouldShowLoading: true };
+    }
+    
+    return { 
+      shouldRedirect: !subAdminAuth.isLoggedIn, 
+      shouldShowLoading: false 
+    };
+  }, [subAdminAuth?.isLoggedIn, subAdminAuth?.token]);
+  
+  if (authState.shouldShowLoading) {
+    return <LoadingSpinner />;
+  }
+  
+  if (authState.shouldRedirect) {
+    return <Navigate to="/subadmin/login" replace />;
+  }
+  
+  return <Outlet />;
 };
 
 export const UserRoute = () => {
-  const isLoggedIn = useSelector((state) => state.userAuth?.isLoggedIn);
-  return isLoggedIn ? <Outlet /> : <Navigate to="/user/login" replace />;
+  const userAuth = useSelector((state) => state.userAuth);
+  
+  // Memoize the auth state to prevent excessive re-renders
+  const authState = useMemo(() => {
+    if (!userAuth) {
+      console.log('UserAuth state not found, redirecting to login');
+      return { shouldRedirect: true, shouldShowLoading: false };
+    }
+    
+    // If we have a token but isLoggedIn is still undefined, show loading
+    if (userAuth.token && userAuth.isLoggedIn === undefined) {
+      console.log('User auth still loading...');
+      return { shouldRedirect: false, shouldShowLoading: true };
+    }
+    
+    // Only log once when the state is determined
+    console.log('UserRoute - Auth state:', {
+      isLoggedIn: userAuth.isLoggedIn,
+      hasToken: !!userAuth.token,
+      hasUser: !!userAuth.user
+    });
+    
+    return { 
+      shouldRedirect: !userAuth.isLoggedIn, 
+      shouldShowLoading: false 
+    };
+  }, [userAuth?.isLoggedIn, userAuth?.token, userAuth?.user]);
+  
+  if (authState.shouldShowLoading) {
+    return <LoadingSpinner />;
+  }
+  
+  if (authState.shouldRedirect) {
+    return <Navigate to="/user/login" replace />;
+  }
+  
+  return <Outlet />;
 };
 
 // Higher-order component for protecting individual routes
 export const ProtectedRoute = ({ children, userType }) => {
-  const adminAuth = useSelector((state) => state.adminAuth.isLoggedIn);
-  const subAdminAuth = useSelector((state) => state.subAdminAuth.isLoggedIn);
-  const userAuth = useSelector((state) => state.userAuth.isLoggedIn);
+  const adminAuth = useSelector((state) => state.adminAuth);
+  const subAdminAuth = useSelector((state) => state.subAdminAuth);
+  const userAuth = useSelector((state) => state.userAuth);
 
   const getRedirectPath = () => {
     switch (userType) {
@@ -36,7 +133,7 @@ export const ProtectedRoute = ({ children, userType }) => {
     }
   };
 
-  const isAuthenticated = () => {
+  const getAuthState = () => {
     switch (userType) {
       case 'admin':
         return adminAuth;
@@ -45,9 +142,39 @@ export const ProtectedRoute = ({ children, userType }) => {
       case 'user':
         return userAuth;
       default:
-        return false;
+        return null;
     }
   };
 
-  return isAuthenticated() ? children : <Navigate to={getRedirectPath()} replace />;
+  const authState = getAuthState();
+  
+  // Memoize the protection logic
+  const protectionState = useMemo(() => {
+    if (!authState) {
+      console.log(`${userType} auth state not found, redirecting`);
+      return { shouldRedirect: true, shouldShowLoading: false };
+    }
+    
+    // If we have a token but isLoggedIn is still undefined, show loading
+    if (authState.token && authState.isLoggedIn === undefined) {
+      console.log(`${userType} auth still loading...`);
+      return { shouldRedirect: false, shouldShowLoading: true };
+    }
+    
+    console.log(`ProtectedRoute (${userType}) - isLoggedIn:`, authState.isLoggedIn);
+    return { 
+      shouldRedirect: !authState.isLoggedIn, 
+      shouldShowLoading: false 
+    };
+  }, [authState?.isLoggedIn, authState?.token, userType]);
+  
+  if (protectionState.shouldShowLoading) {
+    return <LoadingSpinner />;
+  }
+  
+  if (protectionState.shouldRedirect) {
+    return <Navigate to={getRedirectPath()} replace />;
+  }
+  
+  return children;
 };

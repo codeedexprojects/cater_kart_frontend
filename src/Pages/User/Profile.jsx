@@ -19,16 +19,21 @@ import {
 } from 'lucide-react';
 import Header from '../../Components/Users/Header';
 import Footer from '../../Components/Users/Footer';
-import { useNavigate } from 'react-router-dom';
-import avatar from '../../assets/avatar.png'
 import { fetchProfile, updateUserProfile, logoutUser } from '../../Services/Api/User/UserAuthSlice';
+import { useNavigate } from 'react-router-dom';
+import avatar from '../../assets/avatar.png';
 
 const Profile = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   
   // Redux state
-  const { user, profile, isLoading, error } = useSelector((state) => state.userAuth);
+  const { 
+    profile, 
+    loadingStates, 
+    error, 
+    isLoggedIn 
+  } = useSelector(state => state.userAuth);
   
   // Local state
   const [isEditing, setIsEditing] = useState(false);
@@ -48,37 +53,44 @@ const Profile = () => {
   });
   const [licensePreview, setLicensePreview] = useState(null);
 
-  // Get profile data from either profile or user state
-  const profileData = profile || user;
-
+  // Initialize form data when profile is loaded
   useEffect(() => {
-    // Fetch profile data when component mounts
-    dispatch(fetchProfile());
-  }, [dispatch]);
-
-  useEffect(() => {
-    // Update form data when profile data changes
-    if (profileData) {
+    if (profile?.user) {
+      const user = profile.user;
       setFormData({
-        user_name: profileData.user_name || '',
-        role: profileData.role || '',
-        mobile_number: profileData.mobile_number || '',
-        user_id: profileData.user_id || '',
-        address: profileData.address || '',
-        district: profileData.district || '',
-        place: profileData.place || '',
-        experienced: profileData.experienced || false,
-        employment_type: profileData.employment_type || '',
-        has_bike: profileData.has_bike || false,
-        has_license: profileData.has_license || false,
-        license_image: profileData.license_image || null
+        user_name: user.user_name || '',
+        role: user.role || '',
+        mobile_number: user.mobile_number || '',
+        user_id: user.user_id || '',
+        address: user.address || '',
+        district: user.district || '',
+        place: user.place || '',
+        experienced: user.experienced || false,
+        employment_type: user.employment_type || '',
+        has_bike: user.has_bike || false,
+        has_license: user.has_license || false,
+        license_image: user.license_image || null
       });
       
-      if (profileData.license_image) {
-        setLicensePreview(profileData.license_image);
+      if (user.license_image) {
+        setLicensePreview(user.license_image);
       }
     }
-  }, [profileData]);
+  }, [profile]);
+
+  // Fetch profile on component mount
+  useEffect(() => {
+    if (isLoggedIn && !profile) {
+      dispatch(fetchProfile());
+    }
+  }, [dispatch, isLoggedIn, profile]);
+
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!isLoggedIn) {
+      navigate('/login');
+    }
+  }, [isLoggedIn, navigate]);
 
   const handleLogout = () => {
     dispatch(logoutUser());
@@ -110,7 +122,7 @@ const Profile = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     try {
       // Create FormData for file upload
       const formDataToSend = new FormData();
@@ -131,19 +143,16 @@ const Profile = () => {
       
       if (updateUserProfile.fulfilled.match(result)) {
         setIsEditing(false);
-        // Show success message (you can add a toast notification here)
-        console.log('Profile updated successfully');
-      } else {
-        // Handle error (you can add error toast notification here)
-        console.error('Failed to update profile:', result.payload);
+        // Optionally refresh profile data
+        dispatch(fetchProfile());
       }
     } catch (error) {
       console.error('Error updating profile:', error);
     }
   };
 
-  // Show loading spinner while fetching data
-  if (isLoading && !profileData) {
+  // Loading state
+  if (loadingStates.profile && !profile) {
     return (
       <div>
         <Header />
@@ -158,20 +167,36 @@ const Profile = () => {
     );
   }
 
-  // Show error message if no profile data
+  // Error state
+  if (error && !profile) {
+    return (
+      <div>
+        <Header />
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 py-8 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">Error loading profile: {error}</p>
+            <button 
+              onClick={() => dispatch(fetchProfile())}
+              className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  const profileData = profile?.user;
+
   if (!profileData) {
     return (
       <div>
         <Header />
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 py-8 flex items-center justify-center">
           <div className="text-center">
-            <p className="text-red-600 mb-4">Failed to load profile data</p>
-            <button 
-              onClick={() => dispatch(fetchProfile())}
-              className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors"
-            >
-              Retry
-            </button>
+            <p className="text-gray-600">No profile data available</p>
           </div>
         </div>
         <Footer />
@@ -184,9 +209,9 @@ const Profile = () => {
       <Header />
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-red-50 py-8">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Error Message */}
+          {/* Error Display */}
           {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6">
               {error}
             </div>
           )}
@@ -229,8 +254,8 @@ const Profile = () => {
                     
                     <button
                       onClick={() => setIsEditing(!isEditing)}
-                      className="bg-orange-600 text-white px-6 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center mt-4 md:mt-0"
-                      disabled={isLoading}
+                      disabled={loadingStates.profile}
+                      className="bg-orange-600 text-white px-6 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center mt-4 md:mt-0 disabled:opacity-50"
                     >
                       <Edit3 className="w-4 h-4 mr-2" />
                       {isEditing ? 'Cancel Editing' : 'Edit Profile'}
@@ -412,7 +437,7 @@ const Profile = () => {
                         name="user_name"
                         value={formData.user_name}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent bg-gray-100"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                         disabled
                       />
                     </div>
@@ -424,7 +449,7 @@ const Profile = () => {
                         name="role"
                         value={formData.role}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent bg-gray-100"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                         disabled
                       />
                     </div>
@@ -436,7 +461,7 @@ const Profile = () => {
                         name="mobile_number"
                         value={formData.mobile_number}
                         onChange={handleInputChange}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent bg-gray-100"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                         disabled
                       />
                     </div>
@@ -449,6 +474,7 @@ const Profile = () => {
                         value={formData.user_id}
                         onChange={handleInputChange}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-600 focus:border-transparent"
+                        disabled
                       />
                     </div>
                     
@@ -605,16 +631,15 @@ const Profile = () => {
                       type="button"
                       onClick={() => setIsEditing(false)}
                       className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition-colors"
-                      disabled={isLoading}
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50"
-                      disabled={isLoading}
+                      disabled={loadingStates.profile}
                     >
-                      {isLoading ? 'Saving...' : 'Save Changes'}
+                      {loadingStates.profile ? 'Saving...' : 'Save Changes'}
                     </button>
                   </div>
                 </form>

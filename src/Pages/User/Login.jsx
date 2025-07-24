@@ -57,7 +57,6 @@ const Login = () => {
       password: formData.password
     };
     dispatch(loginUser(reqBody));
-    navigate('/')
   };
 
   return (

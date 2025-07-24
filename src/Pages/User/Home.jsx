@@ -22,13 +22,18 @@ const CaterKartHomePage = () => {
     isLoggedIn
   } = useSelector((state) => state.userAuth);
 
-  // Initial data fetch
+  // Initial data fetch - Only once when component mounts and user is logged in
   useEffect(() => {
-    if (isLoggedIn) {
+    if (isLoggedIn && !userCounts) {
       dispatch(fetchUserCounts());
+    }
+  }, [dispatch, isLoggedIn, userCounts]);
+
+  useEffect(() => {
+    if (isLoggedIn && (!workList || workList.length === 0)) {
       dispatch(fetchWorkList());
     }
-  }, [dispatch, isLoggedIn]);
+  }, [dispatch, isLoggedIn, workList]);
 
   // Handle errors
   useEffect(() => {
@@ -75,8 +80,10 @@ const CaterKartHomePage = () => {
           />
         )}
 
-        {/* Available Work Section - Remove duplicate fetch logic */}
+        {/* Available Work Section - Pass workList as prop to prevent duplicate API calls */}
         <AvailableWorkSection 
+          workList={workList}
+          isLoading={isLoading}
           handleCardClick={handleCardClick}
           handleRequestWork={handleRequestWork}
         />
