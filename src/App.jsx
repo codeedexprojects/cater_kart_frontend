@@ -23,6 +23,7 @@ import MyWorksPage from './Pages/User/MyWork';
 import CateringJobDetails from './Pages/User/WorkDetail';
 import Login from './Pages/User/Login'
 import RedirectToUserWorkDetails from './RedirectToWorkDetail';
+import LandingPage from './LandingPage/Pages/Home'
 
 // Unified protected routes
 import { AdminRoute, SubAdminRoute, UserRoute } from './PrivateRoute';
@@ -68,7 +69,7 @@ const App = () => {
         </Route>
 
         {/* Legacy user routes (for backward compatibility) */}
-        <Route path="/" element={<Navigate to="/user/home" replace />} />
+        <Route path="/user" element={<Navigate to="/user/home" replace />} />
         <Route path="/profile" element={<Navigate to="/user/profile" replace />} />
         <Route path="/my-works" element={<Navigate to="/user/my-works" replace />} />
         <Route path="/work-details/:id" element={<RedirectToUserWorkDetails />} />
@@ -80,6 +81,10 @@ const App = () => {
           element={<Navigate to="/admin/login" replace />} 
         />
         
+
+        {/* Landing page - accessible to everyone */}
+        <Route path="/" element={<LandingPage />} />
+
         {/* Catch-all route */}
         <Route path="*" element={<Navigate to="/user/login" replace />} />
       </Routes>
