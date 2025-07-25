@@ -12,7 +12,7 @@ export default function LandingHeader() {
 
   useEffect(() => {
     const handleScroll = () => {
-      const sections = ["home", "about"];
+      const sections = ["home", "about", "gallery", "contact"];
       let current = "home";
 
       sections.forEach((id) => {
@@ -33,7 +33,7 @@ export default function LandingHeader() {
   }, []);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm font-serif">
 
       {/* Main header */}
       <div className="bg-white shadow-sm">
@@ -69,6 +69,26 @@ export default function LandingHeader() {
                 }`}
               >
                 About us
+              </a>
+               <a 
+                href="#gallery"
+                className={`pb-1 font-medium transition-colors ${
+                  activeSection === "gallery" 
+                    ? "text-blue-600 border-b-2 border-blue-600" 
+                    : "text-orange-400 hover:text-orange-500"
+                }`}
+              >
+                Gallery
+              </a>
+               <a 
+                href="#contact"
+                className={`pb-1 font-medium transition-colors ${
+                  activeSection === "contact" 
+                    ? "text-blue-600 border-b-2 border-blue-600" 
+                    : "text-orange-400 hover:text-orange-500"
+                }`}
+              >
+                Contact
               </a>
             </nav>
 
@@ -114,6 +134,28 @@ export default function LandingHeader() {
               onClick={() => setIsMenuOpen(false)}
             >
               About us
+            </a>
+            <a 
+              href="#gallery"
+              className={`block pl-3 py-2 font-medium transition-colors ${
+                activeSection === "gallery" 
+                  ? "text-blue-600 border-l-4 border-blue-600 bg-blue-50"
+                  : "text-orange-400 hover:text-orange-500 hover:bg-orange-50"
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Gallery
+            </a>
+            <a 
+              href="#contact"
+              className={`block pl-3 py-2 font-medium transition-colors ${
+                activeSection === "contact" 
+                  ? "text-blue-600 border-l-4 border-blue-600 bg-blue-50"
+                  : "text-orange-400 hover:text-orange-500 hover:bg-orange-50"
+              }`}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Contact
             </a>
           </nav>
         </div>
