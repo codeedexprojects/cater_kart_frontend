@@ -131,7 +131,7 @@ const ContactSection = () => {
             </div>
 
             {/* Contact Form */}
-            <div className="bg-blue-700 rounded-lg p-8">
+            <div className=" rounded-lg p-8" style={{ backgroundColor: "#0A58A3" }}>
               <h3 className="text-white text-2xl font-medium mb-8 font-serif">Contact</h3>
             
             <div className="space-y-6">

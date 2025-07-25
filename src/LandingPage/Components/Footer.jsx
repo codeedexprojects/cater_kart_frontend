@@ -8,7 +8,7 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Centered Blue Line Separator */}
         <div className="flex justify-center mb-12">
-          <div className="w-24 h-1 bg-blue-500 rounded-full"></div>
+          <div className="w-44 h-1  rounded-full" style={{ backgroundColor: "#0A58A3" }}></div>
         </div>
 
         {/* Footer Content */}
