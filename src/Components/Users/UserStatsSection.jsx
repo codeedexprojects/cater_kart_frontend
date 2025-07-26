@@ -36,7 +36,7 @@ const UserStatsSection = () => {
   const stats = {
     acceptedRequests: userCounts?.accepted_requests || 0,
     pendingRequests: userCounts?.pending_requests || 0,
-    totalJobs: userCounts?.total_jobs || 0,
+    totalJobs: userCounts?.published_work_count || 0,
     completedJobs: userCounts?.completed_jobs || 0
   };
 
@@ -65,7 +65,7 @@ const UserStatsSection = () => {
       path: "/user/my-works?filter=pending"
     },
     {
-      title: "Total Works",
+      title: "Published Work",
       value: stats.totalJobs,
       icon: ChefHat,
       iconColor: "text-blue-300",
