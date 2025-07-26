@@ -50,6 +50,7 @@ const initialState = {
   token: hasValidToken ? storedToken : null,
   isLoggedIn: hasValidToken,
   isLoading: false,
+  averageRating: null,
   error: null,
   profile: null,
   workList: [],
@@ -62,7 +63,8 @@ const initialState = {
     workList: 0,
     myWorks: 0,
     userCounts: 0,
-    currentWork: {}
+    currentWork: {},
+    averageRating: 0,
   },
   // Add loading states for individual operations
   loadingStates: {
@@ -70,6 +72,7 @@ const initialState = {
     workList: false,
     myWorks: false,
     userCounts: false,
+    averageRating: false,
     currentWork: false,
     updateProfile: false
   }
@@ -195,7 +198,7 @@ export const requestWork = createAsyncThunk(
       const { data } = await axios.post(`${API_BASE_URL}/users/work-request/create/`, requestData, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return data;
+      return { ...data, workId: requestData.work };
     } catch (error) {
       return rejectWithValue(handleAsyncError(error));
     }
@@ -240,6 +243,28 @@ export const fetchUserCounts = createAsyncThunk(
   }
 );
 
+
+export const fetchUserAverageRating = createAsyncThunk(
+  'userAuth/fetchUserAverageRating', 
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const token = getState().userAuth.token;
+      if (!token) {
+        return rejectWithValue('No authentication token found');
+      }
+      
+      const { data } = await axios.get(`${API_BASE_URL}/users/my-average-rating/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return data;
+    } catch (error) {
+      return rejectWithValue(handleAsyncError(error));
+    }
+  }
+);
+
+
+
 // Slice
 const userAuthSlice = createSlice({
   name: 'userAuth',
@@ -248,6 +273,7 @@ const userAuthSlice = createSlice({
     logoutUser: (state) => {
       Object.assign(state, {
         user: null,
+        averageRating: null,
         token: null,
         isLoggedIn: false,
         error: null,
@@ -260,6 +286,7 @@ const userAuthSlice = createSlice({
         lastFetch: {
           profile: 0,
           workList: 0,
+          averageRating: 0,
           myWorks: 0,
           userCounts: 0,
           currentWork: {}
@@ -269,6 +296,7 @@ const userAuthSlice = createSlice({
           workList: false,
           myWorks: false,
           userCounts: false,
+          averageRating: false,
           currentWork: false,
           updateProfile: false
         }
@@ -442,19 +470,35 @@ const userAuthSlice = createSlice({
         state.error = action.payload;
       })
       
-      // Request Work cases
       .addCase(requestWork.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
       .addCase(requestWork.fulfilled, (state, action) => {
         state.isLoading = false;
-        // Optionally update myWorks or trigger a refetch
       })
       .addCase(requestWork.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
-      });
+      })
+      .addCase(fetchUserAverageRating.pending, (state) => {
+      state.loadingStates.averageRating = true;
+      state.error = null;
+    })
+    .addCase(fetchUserAverageRating.fulfilled, (state, action) => {
+      state.loadingStates.averageRating = false;
+      state.averageRating = action.payload;
+      state.lastFetch.averageRating = Date.now();
+    })
+    .addCase(fetchUserAverageRating.rejected, (state, action) => {
+      state.loadingStates.averageRating = false;
+      state.error = action.payload;
+      if (action.payload?.includes('Session expired')) {
+        state.user = null;
+        state.token = null;
+        state.isLoggedIn = false;
+      }
+    });
   },
 });
 

@@ -21,8 +21,8 @@ const MyWorksPage = () => {
   
   const loading = loadingStates?.myWorks || false;
   
-  // Local state
-  const [activeTab, setActiveTab] = useState('active');
+  // Local state - Updated tabs to match work_status
+  const [activeTab, setActiveTab] = useState('all');
   const [selectedWork, setSelectedWork] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -56,38 +56,77 @@ const MyWorksPage = () => {
     navigate(`/work-details/${workDetailId}`);
   }, [navigate]);
 
-  // Memoized function to group works by status
-  const worksByStatus = useMemo(() => {
+  // Fixed: Group works by work_status and status for proper filtering
+  const worksByCategory = useMemo(() => {
     if (!Array.isArray(workData)) {
       return {
         pending: [],
-        accepted: [],
-        rejected: []
+        completed: [],
+        requestPending: [],
+        requestAccepted: [],
+        requestRejected: []
       };
     }
     
     return workData.reduce((acc, work) => {
-      const status = work.status || 'pending';
-      if (!acc[status]) acc[status] = [];
-      acc[status].push(work);
+      // Group by work_status (pending/completed)
+      const workStatus = work.work_status || 'pending';
+      if (workStatus === 'pending') {
+        acc.pending.push(work);
+      } else if (workStatus === 'completed') {
+        acc.completed.push(work);
+      }
+
+      // Also group by request status for reference
+      const requestStatus = work.status || 'pending';
+      if (requestStatus === 'pending') {
+        acc.requestPending.push(work);
+      } else if (requestStatus === 'accepted') {
+        acc.requestAccepted.push(work);
+      } else if (requestStatus === 'rejected') {
+        acc.requestRejected.push(work);
+      }
+
       return acc;
     }, {
       pending: [],
-      accepted: [],
-      rejected: []
+      completed: [],
+      requestPending: [],
+      requestAccepted: [],
+      requestRejected: []
     });
   }, [workData]);
 
-  const getStatusColor = useCallback((status) => {
+  // Updated: Color schemes for work_status
+  const getWorkStatusColor = useCallback((workStatus) => {
     const colors = {
       pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      completed: 'bg-green-100 text-green-800 border-green-200'
+    };
+    return colors[workStatus] || 'bg-gray-100 text-gray-800 border-gray-200';
+  }, []);
+
+  // Updated: Icons for work_status
+  const getWorkStatusIcon = useCallback((workStatus) => {
+    const icons = {
+      pending: Clock,
+      completed: CheckCircle
+    };
+    return icons[workStatus] || Clock;
+  }, []);
+
+  // Color schemes for request status
+  const getRequestStatusColor = useCallback((status) => {
+    const colors = {
+      pending: 'bg-blue-100 text-blue-800 border-blue-200',
       accepted: 'bg-green-100 text-green-800 border-green-200',
       rejected: 'bg-red-100 text-red-800 border-red-200'
     };
     return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200';
   }, []);
 
-  const getStatusIcon = useCallback((status) => {
+  // Icons for request status
+  const getRequestStatusIcon = useCallback((status) => {
     const icons = {
       pending: AlertCircle,
       accepted: CheckCircle,
@@ -96,32 +135,52 @@ const MyWorksPage = () => {
     return icons[status] || AlertCircle;
   }, []);
 
-  // Memoized tabs data
+  // Updated tabs data to reflect work_status
   const tabs = useMemo(() => [
     {
-      id: 'active',
-      label: 'Active',
-      count: worksByStatus.pending.length + worksByStatus.accepted.length
+      id: 'all',
+      label: 'All Works',
+      count: Array.isArray(workData) ? workData.length : 0
     },
-    { id: 'pending', label: 'Pending', count: worksByStatus.pending.length },
-    { id: 'accepted', label: 'Accepted', count: worksByStatus.accepted.length },
-    { id: 'rejected', label: 'Rejected', count: worksByStatus.rejected.length }
-  ], [worksByStatus]);
+    { 
+      id: 'pending', 
+      label: 'Pending Works', 
+      count: worksByCategory.pending.length 
+    },
+    { 
+      id: 'completed', 
+      label: 'Completed Works', 
+      count: worksByCategory.completed.length 
+    },
+    { 
+      id: 'accepted', 
+      label: 'Accepted Requests', 
+      count: worksByCategory.requestAccepted.length 
+    },
+    { 
+      id: 'rejected', 
+      label: 'Rejected Requests', 
+      count: worksByCategory.requestRejected.length 
+    }
+  ], [worksByCategory, workData]);
 
+  // Updated: Get works for each tab based on work_status and request status
   const getWorksForTab = useCallback((tabId) => {
     switch (tabId) {
-      case 'active':
-        return [...worksByStatus.pending, ...worksByStatus.accepted];
+      case 'all':
+        return Array.isArray(workData) ? workData : [];
       case 'pending':
-        return worksByStatus.pending;
+        return worksByCategory.pending;
+      case 'completed':
+        return worksByCategory.completed;
       case 'accepted':
-        return worksByStatus.accepted;
+        return worksByCategory.requestAccepted;
       case 'rejected':
-        return worksByStatus.rejected;
+        return worksByCategory.requestRejected;
       default:
         return Array.isArray(workData) ? workData : [];
     }
-  }, [worksByStatus, workData]);
+  }, [worksByCategory, workData]);
 
   const formatTime = useCallback((timeString) => {
     if (!timeString) return 'N/A';
@@ -142,22 +201,31 @@ const MyWorksPage = () => {
     });
   }, []);
 
-  // Memoized WorkCard component
+  // Updated WorkCard component to show both statuses
   const WorkCard = React.memo(({ work }) => {
-    const StatusIcon = getStatusIcon(work.status);
+    const WorkStatusIcon = getWorkStatusIcon(work.work_status);
+    const RequestStatusIcon = getRequestStatusIcon(work.status);
     const workDetail = work.work_detail;
 
     return (
       <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-all duration-300">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
               <h3 className="text-lg font-bold text-gray-800">
                 {workDetail?.date} - {workDetail?.Auditorium_name}
               </h3>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(work.status)}`}>
-                <StatusIcon className="w-3 h-3 inline mr-1" />
-                {work.status.toUpperCase()}
+              
+              {/* Work Status Badge */}
+              <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getWorkStatusColor(work.work_status)}`}>
+                <WorkStatusIcon className="w-3 h-3 inline mr-1" />
+                Work: {(work.work_status || 'pending').toUpperCase()}
+              </span>
+              
+              {/* Request Status Badge */}
+              <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getRequestStatusColor(work.status)}`}>
+                <RequestStatusIcon className="w-3 h-3 inline mr-1" />
+                Request: {(work.status || 'pending').toUpperCase()}
               </span>
             </div>
             <p className="text-gray-600 font-medium">
@@ -196,9 +264,9 @@ const MyWorksPage = () => {
 
         <div className="flex items-center justify-between pt-4 border-t border-gray-100">
           <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${work.status === 'accepted' ? 'bg-green-500' :
-              work.status === 'rejected' ? 'bg-red-500' : 'bg-yellow-500'
-              }`}></div>
+            <div className={`w-2 h-2 rounded-full ${
+              work.work_status === 'completed' ? 'bg-green-500' : 'bg-yellow-500'
+            }`}></div>
             <span className="text-sm text-gray-600">
               Requested on {new Date(work.requested_at).toLocaleDateString()}
             </span>
@@ -332,7 +400,7 @@ const MyWorksPage = () => {
             </div>
           </div>
 
-          {/* Stats Cards - Modified for responsive layout */}
+          {/* Updated Stats Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             {/* Total Works Card */}
             <div className="bg-white rounded-xl shadow-lg p-4">
@@ -347,25 +415,25 @@ const MyWorksPage = () => {
               </div>
             </div>
 
-            {/* Pending Card */}
+            {/* Pending Works Card */}
             <div className="bg-white rounded-xl shadow-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs md:text-sm text-gray-600">Pending</p>
-                  <p className="text-xl md:text-2xl font-bold text-yellow-600">{worksByStatus.pending.length}</p>
+                  <p className="text-xs md:text-sm text-gray-600">Pending Works</p>
+                  <p className="text-xl md:text-2xl font-bold text-yellow-600">{worksByCategory.pending.length}</p>
                 </div>
                 <div className="w-10 h-10 md:w-12 md:h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                  <AlertCircle className="w-5 h-5 md:w-6 md:h-6 text-yellow-600" />
+                  <Clock className="w-5 h-5 md:w-6 md:h-6 text-yellow-600" />
                 </div>
               </div>
             </div>
 
-            {/* Accepted Card */}
+            {/* Completed Works Card */}
             <div className="bg-white rounded-xl shadow-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs md:text-sm text-gray-600">Accepted</p>
-                  <p className="text-xl md:text-2xl font-bold text-green-600">{worksByStatus.accepted.length}</p>
+                  <p className="text-xs md:text-sm text-gray-600">Completed</p>
+                  <p className="text-xl md:text-2xl font-bold text-green-600">{worksByCategory.completed.length}</p>
                 </div>
                 <div className="w-10 h-10 md:w-12 md:h-12 bg-green-100 rounded-lg flex items-center justify-center">
                   <CheckCircle className="w-5 h-5 md:w-6 md:h-6 text-green-600" />
@@ -373,15 +441,15 @@ const MyWorksPage = () => {
               </div>
             </div>
 
-            {/* Rejected Card */}
+            {/* Accepted Requests Card */}
             <div className="bg-white rounded-xl shadow-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs md:text-sm text-gray-600">Rejected</p>
-                  <p className="text-xl md:text-2xl font-bold text-red-600">{worksByStatus.rejected.length}</p>
+                  <p className="text-xs md:text-sm text-gray-600">Accepted</p>
+                  <p className="text-xl md:text-2xl font-bold text-green-600">{worksByCategory.requestAccepted.length}</p>
                 </div>
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                  <XCircle className="w-5 h-5 md:w-6 md:h-6 text-red-600" />
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 md:w-6 md:h-6 text-green-600" />
                 </div>
               </div>
             </div>

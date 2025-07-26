@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import toast, { Toaster } from 'react-hot-toast';
 import Header from '../../Components/Users/Header';
 import Footer from '../../Components/Users/Footer';
-import { fetchWorkById, requestWork, clearCurrentWork } from '../../Services/Api/User/UserAuthSlice';
+import { fetchWorkById, requestWork, clearCurrentWork, fetchWorkList } from '../../Services/Api/User/UserAuthSlice';
 import ConfirmationModal from '../../Components/Users/ConfirnationModal';
 
 const CateringStaffJobDetails = () => {
@@ -80,7 +80,9 @@ const CateringStaffJobDetails = () => {
         });
         
         // Refresh the job details to show updated status
-        dispatch(fetchWorkById(id));
+        await dispatch(fetchWorkById(id));
+        // Also refresh the work list to update the available work section
+        dispatch(fetchWorkList());
       } else {
         // Handle rejection
         const errorMessage = resultAction.payload || 'Failed to send work request. Please try again.';

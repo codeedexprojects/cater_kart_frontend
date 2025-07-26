@@ -333,13 +333,15 @@ export const submitSubAdminSupervisorWage = createAsyncThunk(
   }
 );
 
-// API for updating subadmin/supervisor wage (assuming similar pattern)
 export const updateSubAdminSupervisorWage = createAsyncThunk(
   'subAdminAuth/updateSubAdminSupervisorWage',
   async ({ wageId, wageData }, { getState, rejectWithValue }) => {
     try {
       const { subAdminAuth } = getState();
-      const response = await axios.patch(`${API_BASE_URL}/sub_admin/submit-subadmin-wage/${wageId}/`, wageData, {
+      const response = await axios.patch(`${API_BASE_URL}/sub_admin/subadmin-wage/edit/`, {
+        wage_id: wageId,
+        ...wageData
+      }, {
         headers: {
           'Authorization': `Bearer ${subAdminAuth.tokens?.access}`,
           'Content-Type': 'application/json',
@@ -352,6 +354,98 @@ export const updateSubAdminSupervisorWage = createAsyncThunk(
         return rejectWithValue('Session expired. Please login again.');
       }
       return rejectWithValue(error.response?.data?.message || 'Failed to update wage');
+    }
+  }
+);
+
+export const getSubAdminSupervisorWage = createAsyncThunk(
+  'subAdminAuth/getSubAdminSupervisorWage',
+  async (wageId, { getState, rejectWithValue }) => {
+    try {
+      const { subAdminAuth } = getState();
+      const response = await axios.get(`${API_BASE_URL}/sub_admin/subadmin-wage/${wageId}/`, {
+        headers: {
+          'Authorization': `Bearer ${subAdminAuth.tokens?.access}`,
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 401) {
+        return rejectWithValue('Session expired. Please login again.');
+      }
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch wage data');
+    }
+  }
+);
+
+
+// Get total wages for a work
+export const getTotalWages = createAsyncThunk(
+  'subAdminAuth/getTotalWages',
+  async (workId, { getState, rejectWithValue }) => {
+    try {
+      const { subAdminAuth } = getState();
+      const response = await axios.get(`${API_BASE_URL}/sub_admin/wages/total-paid/boys/${workId}/`, {
+        headers: {
+          'Authorization': `Bearer ${subAdminAuth.tokens?.access}`,
+        },
+      });
+      
+      return { workId, data: response.data };
+    } catch (error) {
+      if (error.response?.status === 401) {
+        return rejectWithValue('Session expired. Please login again.');
+      }
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch total wages');
+    }
+  }
+);
+
+// Update work status
+export const updateWorkStatus = createAsyncThunk(
+  'subAdminAuth/updateWorkStatus',
+  async ({ workId, status }, { getState, rejectWithValue }) => {
+    try {
+      const { subAdminAuth } = getState();
+      const response = await axios.patch(`${API_BASE_URL}/sub_admin/catering-work/${workId}/update/`, 
+        { status }, 
+        {
+          headers: {
+            'Authorization': `Bearer ${subAdminAuth.tokens?.access}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      
+      return { workId, status, data: response.data };
+    } catch (error) {
+      if (error.response?.status === 401) {
+        return rejectWithValue('Session expired. Please login again.');
+      }
+      return rejectWithValue(error.response?.data?.message || 'Failed to update work status');
+    }
+  }
+);
+
+// Get boy wage for editing
+export const getBoyWage = createAsyncThunk(
+  'subAdminAuth/getBoyWage',
+  async (wageId, { getState, rejectWithValue }) => {
+    try {
+      const { subAdminAuth } = getState();
+      const response = await axios.get(`${API_BASE_URL}/sub_admin/boy-wage/${wageId}/`, {
+        headers: {
+          'Authorization': `Bearer ${subAdminAuth.tokens?.access}`,
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      if (error.response?.status === 401) {
+        return rejectWithValue('Session expired. Please login again.');
+      }
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch boy wage');
     }
   }
 );
@@ -389,6 +483,11 @@ const initialState = {
     isLoading: false,
     error: null,
     data: [],
+  },
+  subAdminWageData: {
+    isLoading: false,
+    error: null,
+    data: null,
   },
   userEdit: {
     isLoading: false,
@@ -448,7 +547,22 @@ const initialState = {
     isLoading: false,
     error: null,
     success: false,
-  }
+  },
+  totalWages: {
+    isLoading: false,
+    error: null,
+    data: {},
+  },
+  workStatusUpdate: {
+    isLoading: false,
+    error: null,
+    success: false,
+  },
+  boyWageData: {
+    isLoading: false,
+    error: null,
+    data: null,
+  },
 };
 
 const subAdminAuthSlice = createSlice({
@@ -533,6 +647,10 @@ clearUpdateBoyWageState: (state) => {
   state.updateBoyWage.error = null;
   state.updateBoyWage.success = false;
 },
+clearSubAdminWageData: (state) => {
+  state.subAdminWageData.error = null;
+  state.subAdminWageData.data = null;
+},
 clearUpdateSubAdminSupervisorWageState: (state) => {
   state.updateSubAdminSupervisorWage.error = null;
   state.updateSubAdminSupervisorWage.success = false;
@@ -566,6 +684,17 @@ clearExtraExpenseState: (state) => {
   state.boyWage.error = null;
   state.boyWage.success = false;
 },
+clearTotalWagesError: (state) => {
+    state.totalWages.error = null;
+  },
+  clearWorkStatusUpdateState: (state) => {
+    state.workStatusUpdate.error = null;
+    state.workStatusUpdate.success = false;
+  },
+  clearBoyWageData: (state) => {
+    state.boyWageData.error = null;
+    state.boyWageData.data = null;
+  },
 clearBoyRatingState: (state) => {
   state.boyRating.error = null;
   state.boyRating.success = false;
@@ -851,6 +980,95 @@ clearUpdateRatingState: (state) => {
 .addCase(updateSubAdminSupervisorWage.rejected, (state, action) => {
   state.updateSubAdminSupervisorWage.isLoading = false;
   state.updateSubAdminSupervisorWage.error = action.payload;
+  if (action.payload === 'Session expired. Please login again.') {
+    state.admin = null;
+    state.tokens = null;
+    state.isLoggedIn = false;
+    localStorage.removeItem('subAdminToken');
+    localStorage.removeItem('subAdminUser');
+  }
+})
+// Get Total Wages
+.addCase(getTotalWages.pending, (state) => {
+  state.totalWages.isLoading = true;
+  state.totalWages.error = null;
+})
+.addCase(getTotalWages.fulfilled, (state, action) => {
+  state.totalWages.isLoading = false;
+  state.totalWages.data[action.payload.workId] = action.payload.data;
+})
+.addCase(getTotalWages.rejected, (state, action) => {
+  state.totalWages.isLoading = false;
+  state.totalWages.error = action.payload;
+  if (action.payload === 'Session expired. Please login again.') {
+    state.admin = null;
+    state.tokens = null;
+    state.isLoggedIn = false;
+    localStorage.removeItem('subAdminToken');
+    localStorage.removeItem('subAdminUser');
+  }
+})
+// Update Work Status
+.addCase(updateWorkStatus.pending, (state) => {
+  state.workStatusUpdate.isLoading = true;
+  state.workStatusUpdate.error = null;
+  state.workStatusUpdate.success = false;
+})
+.addCase(updateWorkStatus.fulfilled, (state, action) => {
+  state.workStatusUpdate.isLoading = false;
+  state.workStatusUpdate.success = true;
+  // Update the work status in both upcoming and past lists
+  const { workId, status } = action.payload;
+  ['upcoming', 'past'].forEach(type => {
+    const workIndex = state.cateringWorkList[type].data.findIndex(work => work.id === workId);
+    if (workIndex !== -1) {
+      state.cateringWorkList[type].data[workIndex].status = status;
+    }
+  });
+})
+.addCase(updateWorkStatus.rejected, (state, action) => {
+  state.workStatusUpdate.isLoading = false;
+  state.workStatusUpdate.error = action.payload;
+  if (action.payload === 'Session expired. Please login again.') {
+    state.admin = null;
+    state.tokens = null;
+    state.isLoggedIn = false;
+    localStorage.removeItem('subAdminToken');
+    localStorage.removeItem('subAdminUser');
+  }
+})
+// Get Boy Wage
+.addCase(getBoyWage.pending, (state) => {
+  state.boyWageData.isLoading = true;
+  state.boyWageData.error = null;
+})
+.addCase(getBoyWage.fulfilled, (state, action) => {
+  state.boyWageData.isLoading = false;
+  state.boyWageData.data = action.payload;
+})
+.addCase(getBoyWage.rejected, (state, action) => {
+  state.boyWageData.isLoading = false;
+  state.boyWageData.error = action.payload;
+  if (action.payload === 'Session expired. Please login again.') {
+    state.admin = null;
+    state.tokens = null;
+    state.isLoggedIn = false;
+    localStorage.removeItem('subAdminToken');
+    localStorage.removeItem('subAdminUser');
+  }
+})
+// Get SubAdmin/Supervisor Wage
+.addCase(getSubAdminSupervisorWage.pending, (state) => {
+  state.subAdminWageData.isLoading = true;
+  state.subAdminWageData.error = null;
+})
+.addCase(getSubAdminSupervisorWage.fulfilled, (state, action) => {
+  state.subAdminWageData.isLoading = false;
+  state.subAdminWageData.data = action.payload;
+})
+.addCase(getSubAdminSupervisorWage.rejected, (state, action) => {
+  state.subAdminWageData.isLoading = false;
+  state.subAdminWageData.error = action.payload;
   if (action.payload === 'Session expired. Please login again.') {
     state.admin = null;
     state.tokens = null;

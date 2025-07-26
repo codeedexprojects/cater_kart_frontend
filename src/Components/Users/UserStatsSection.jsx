@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Award, ChefHat, TrendingUp, BarChart3 } from 'lucide-react';
+import { Award, ChefHat, TrendingUp, BarChart3, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { fetchUserCounts, fetchProfile } from '../../Services/Api/User/UserAuthSlice';
+import { fetchUserCounts, fetchProfile, fetchUserAverageRating } from '../../Services/Api/User/UserAuthSlice';
 
 const UserStatsSection = () => {
   const dispatch = useDispatch();
@@ -11,22 +11,26 @@ const UserStatsSection = () => {
     user, 
     userCounts, 
     profile, 
+    averageRating,
     isLoading 
   } = useSelector((state) => state.userAuth);
 
   useEffect(() => {
-    // Fetch user counts and profile if not already loaded
+    // Fetch user counts, profile, and average rating if not already loaded
     if (!userCounts) {
       dispatch(fetchUserCounts());
     }
     if (!profile) {
       dispatch(fetchProfile());
     }
-  }, [dispatch, userCounts, profile]);
+    if (!averageRating) {
+      dispatch(fetchUserAverageRating());
+    }
+  }, [dispatch, userCounts, profile, averageRating]);
 
   // Get user data from either profile or user state
   const userData = profile || user || {};
-  const userName = userData.name || userData.first_name || userData.username || "User";
+  const userName = userData?.user_name || user?.user_name || profile?.user_name || "User";
 
   // Get stats from userCounts or provide defaults
   const stats = {
@@ -35,6 +39,15 @@ const UserStatsSection = () => {
     totalJobs: userCounts?.total_jobs || 0,
     completedJobs: userCounts?.completed_jobs || 0
   };
+
+  // Get rating data
+  const ratingData = {
+    averageRating: averageRating?.average_rating || 0,
+    totalRatings: averageRating?.total_ratings || 0
+  };
+
+  // Format rating display (e.g., "4.5" or "0.0")
+  const formattedRating = ratingData.averageRating.toFixed(1);
 
   const statsCards = [
     {
@@ -57,6 +70,14 @@ const UserStatsSection = () => {
       icon: ChefHat,
       iconColor: "text-blue-300",
       path: "/user/my-works"
+    },
+    {
+      title: "Average Rating",
+      value: `${formattedRating}/5`,
+      subtitle: `${ratingData.totalRatings} reviews`,
+      icon: Star,
+      iconColor: "text-purple-300",
+      path: "/user/reviews" // Adjust path as needed
     }
   ];
 
@@ -67,8 +88,8 @@ const UserStatsSection = () => {
           <div className="animate-pulse">
             <div className="h-8 bg-white/20 rounded w-1/2 mb-4"></div>
             <div className="h-4 bg-white/20 rounded w-1/3 mb-6"></div>
-            <div className="grid grid-cols-3 gap-4">
-              {[1, 2, 3].map((i) => (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
                 <div key={i} className="bg-white/20 backdrop-blur-sm rounded-xl p-4">
                   <div className="h-6 bg-white/20 rounded mb-2"></div>
                   <div className="h-8 bg-white/20 rounded mb-2"></div>
@@ -96,6 +117,7 @@ const UserStatsSection = () => {
             onClick={() => {
               dispatch(fetchUserCounts());
               dispatch(fetchProfile());
+              dispatch(fetchUserAverageRating());
             }}
             className="hidden md:flex items-center px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-sm font-medium"
           >
@@ -104,7 +126,7 @@ const UserStatsSection = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {statsCards.map((stat, index) => (
             <Link
               key={index}
@@ -116,6 +138,9 @@ const UserStatsSection = () => {
               </div>
               <div className="text-2xl font-bold">{stat.value}</div>
               <div className="text-orange-100 text-sm">{stat.title}</div>
+              {stat.subtitle && (
+                <div className="text-orange-200 text-xs mt-1">{stat.subtitle}</div>
+              )}
             </Link>
           ))}
         </div>
@@ -128,6 +153,27 @@ const UserStatsSection = () => {
             </p>
           </div>
         </div>
+
+        {/* Star rating visual for better UX */}
+        {ratingData.totalRatings > 0 && (
+          <div className="mt-4 pt-4 border-t border-white/20">
+            <div className="flex items-center justify-center space-x-1">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  className={`w-5 h-5 ${
+                    star <= Math.round(ratingData.averageRating)
+                      ? 'text-yellow-300 fill-current'
+                      : 'text-white/40'
+                  }`}
+                />
+              ))}
+              <span className="ml-2 text-orange-100 text-sm">
+                ({ratingData.totalRatings} review{ratingData.totalRatings !== 1 ? 's' : ''})
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

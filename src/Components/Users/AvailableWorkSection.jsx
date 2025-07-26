@@ -1,18 +1,76 @@
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { MapPin, Clock, Users, Calendar, ChefHat, Building } from 'lucide-react';
-import { fetchWorkList, requestWork } from '../../Services/Api/User/UserAuthSlice';
+import { MapPin, Clock, Users, Calendar, ChefHat, Building, CheckCircle } from 'lucide-react';
+import { fetchWorkList, requestWork, fetchWorkById } from '../../Services/Api/User/UserAuthSlice';
 import toast from 'react-hot-toast';
 
 const AvailableWorkSection = ({ handleCardClick, handleRequestWork: parentHandleRequestWork }) => {
   const dispatch = useDispatch();
   const { workList: availableWork, isLoading, error } = useSelector((state) => state.userAuth);
+  
+  // Store work details for each work to check join_requests
+  const [workDetails, setWorkDetails] = React.useState({});
+  const [loadingWorkDetails, setLoadingWorkDetails] = React.useState({});
 
-  // Remove the useEffect that was causing duplicate API calls
-  // The parent component now handles initial data fetching
+  // Fetch work details for each available work to check join_requests
+  React.useEffect(() => {
+    if (availableWork && availableWork.length > 0) {
+      availableWork.forEach(async (work) => {
+        if (!workDetails[work.id] && !loadingWorkDetails[work.id]) {
+          setLoadingWorkDetails(prev => ({ ...prev, [work.id]: true }));
+          
+          try {
+            const resultAction = await dispatch(fetchWorkById(work.id));
+            if (fetchWorkById.fulfilled.match(resultAction)) {
+              setWorkDetails(prev => ({ 
+                ...prev, 
+                [work.id]: resultAction.payload 
+              }));
+            }
+          } catch (error) {
+            console.error(`Error fetching work details for ${work.id}:`, error);
+          } finally {
+            setLoadingWorkDetails(prev => ({ ...prev, [work.id]: false }));
+          }
+        }
+      });
+    }
+  }, [availableWork, dispatch, workDetails, loadingWorkDetails]);
+
+  // Function to check if user has applied using the same logic as work detail page
+  const hasUserApplied = (workId) => {
+    const workDetail = workDetails[workId];
+    if (!workDetail) return false;
+    
+    // Use the same logic as work detail page: check join_requests
+    return workDetail.join_requests && workDetail.join_requests.length > 0;
+  };
+
+  // Function to get application status using the same logic as work detail page
+  const getApplicationStatus = (workId) => {
+    const workDetail = workDetails[workId];
+    if (!workDetail || !workDetail.join_requests || workDetail.join_requests.length === 0) {
+      return null;
+    }
+    
+    const request = workDetail.join_requests[0];
+    return {
+      status: request.status,
+      assigned: request.assigned,
+      comment: request.comment,
+      requestedAt: request.requested_at,
+      updatedAt: request.updated_at
+    };
+  };
 
   const handleRequestWork = async (workId, e) => {
     e.stopPropagation(); // Prevent card click when button is clicked
+    
+    // Check if user has already applied using the same logic as work detail page
+    if (hasUserApplied(workId)) {
+      toast.error('You have already applied for this work!');
+      return;
+    }
     
     const loadingToast = toast.loading('Sending work request...');
 
@@ -21,19 +79,39 @@ const AvailableWorkSection = ({ handleCardClick, handleRequestWork: parentHandle
         work: parseInt(workId)
       };
 
-      await dispatch(requestWork(requestBody)).unwrap();
+      // Use the same pattern as work detail page
+      const resultAction = await dispatch(requestWork(requestBody));
       
-      toast.success('Work request sent successfully!', {
-        id: loadingToast,
-        duration: 4000,
-      });
-
-      // Refresh the work list to get updated data
-      dispatch(fetchWorkList());
-      
+      if (requestWork.fulfilled.match(resultAction)) {
+        toast.success('Work request sent successfully!', {
+          id: loadingToast,
+          duration: 4000,
+        });
+        
+        // Refresh the specific work details to show updated status
+        // Use the same pattern as work detail page
+        const updatedWorkResult = await dispatch(fetchWorkById(workId));
+        if (fetchWorkById.fulfilled.match(updatedWorkResult)) {
+          setWorkDetails(prev => ({ 
+            ...prev, 
+            [workId]: updatedWorkResult.payload 
+          }));
+        }
+        
+        // Also refresh the work list
+        dispatch(fetchWorkList());
+        
+      } else {
+        // Handle rejection - same pattern as work detail page
+        const errorMessage = resultAction.payload || 'Failed to send work request. Please try again.';
+        toast.error(errorMessage, {
+          id: loadingToast,
+          duration: 4000,
+        });
+      }
     } catch (error) {
       console.error('Error requesting work:', error);
-      toast.error(error || 'Failed to send work request. Please try again.', {
+      toast.error('Failed to send work request. Please try again.', {
         id: loadingToast,
         duration: 4000,
       });
@@ -42,6 +120,8 @@ const AvailableWorkSection = ({ handleCardClick, handleRequestWork: parentHandle
 
   const handleRefresh = () => {
     dispatch(fetchWorkList());
+    // Clear work details to force refetch
+    setWorkDetails({});
   };
 
   // Loading state
@@ -159,68 +239,95 @@ const AvailableWorkSection = ({ handleCardClick, handleRequestWork: parentHandle
       </div>
 
       <div className="grid gap-6">
-        {availableWork.map((work) => (
-          <div
-            key={work.id}
-            className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer"
-            onClick={() => handleCardClick(work.id)}
-          >
-            <div className="p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="text-xl font-bold text-gray-800 mb-1">
-                   {work.date} - {work.Auditorium_name}
-                  </h3>
-                  <p className="text-gray-600 mb-1">
-                    <Building className="inline-block w-4 h-4 text-orange-500 mr-1" />
-                    <span className="font-semibold">{work.Auditorium_name}</span>
-                  </p>
+        {availableWork.map((work) => {
+          // Use the same logic as work detail page for checking application status
+          const userApplied = hasUserApplied(work.id);
+          const applicationStatus = getApplicationStatus(work.id);
+          const isLoadingDetails = loadingWorkDetails[work.id];
+          
+          return (
+            <div
+              key={work.id}
+              className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden hover:shadow-xl transition-all duration-300 hover:scale-[1.02] cursor-pointer"
+              onClick={() => handleCardClick(work.id)}
+            >
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-800 mb-1">
+                     {work.date} - {work.Auditorium_name}
+                    </h3>
+                    <p className="text-gray-600 mb-1">
+                      <Building className="inline-block w-4 h-4 text-orange-500 mr-1" />
+                      <span className="font-semibold">{work.Auditorium_name}</span>
+                    </p>
+                  </div>
+                  {userApplied && (
+                    <div className="flex items-center gap-1 text-green-600 text-sm font-medium">
+                      <CheckCircle className="w-4 h-4" />
+                      Applied
+                    </div>
+                  )}
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                <div className="flex items-center gap-2 text-gray-600">
-                  <MapPin className="w-4 h-4 text-orange-500" />
-                  <span className="text-sm font-semibold">Place: {work.place}</span>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <MapPin className="w-4 h-4 text-orange-500" />
+                    <span className="text-sm font-semibold">Place: {work.place}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Clock className="w-4 h-4 text-orange-500" />
+                    <span className="text-sm"> Reporting Time: {work.reporting_time}</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Users className="w-4 h-4 text-orange-500" />
+                    <span className="text-sm">
+                      Boys Needed: {work.no_of_boys_needed}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Users className="w-4 h-4 text-orange-500" />
+                    <span className="text-sm">
+                      Work Type: {work.work_type}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Clock className="w-4 h-4 text-orange-500" />
-                  <span className="text-sm"> Reporting Time: {work.reporting_time}</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 ${work.is_published ? 'bg-green-500' : 'bg-gray-400'} rounded-full`}></div>
+                    <span className={`text-sm ${work.is_published ? 'text-green-600' : 'text-gray-500'} font-medium`}>
+                      {work.is_published ? 'Published' : 'Unpublished'}
+                    </span>
+                    {userApplied && applicationStatus && (
+                      <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
+                        applicationStatus.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                        applicationStatus.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                        'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {applicationStatus.status.charAt(0).toUpperCase() + applicationStatus.status.slice(1)}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => handleRequestWork(work.id, e)}
+                    disabled={userApplied || isLoadingDetails}
+                    className={`px-6 py-2 rounded-full font-semibold transition-all duration-200 shadow-md hover:shadow-lg ${
+                      userApplied || isLoadingDetails
+                        ? 'bg-gray-400 text-white cursor-not-allowed' 
+                        : 'bg-gradient-to-r from-orange-600 to-red-600 text-white hover:from-orange-700 hover:to-red-700'
+                    }`}
+                  >
+                    {isLoadingDetails ? 'Loading...' : (userApplied ? 'Already Applied' : 'Request Work')}
+                  </button>
                 </div>
-                
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Users className="w-4 h-4 text-orange-500" />
-                  <span className="text-sm">
-                    Boys Needed: {work.no_of_boys_needed}
-                  </span>
-                </div>
-                
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Users className="w-4 h-4 text-orange-500" />
-                  <span className="text-sm">
-                    Work Type: {work.work_type}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 ${work.is_published ? 'bg-green-500' : 'bg-gray-400'} rounded-full`}></div>
-                  <span className={`text-sm ${work.is_published ? 'text-green-600' : 'text-gray-500'} font-medium`}>
-                    {work.is_published ? 'Published' : 'Unpublished'}
-                  </span>
-                </div>
-                <button
-                  onClick={(e) => handleRequestWork(work.id, e)}
-                  className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-2 rounded-full font-semibold hover:from-orange-700 hover:to-red-700 transition-all duration-200 shadow-md hover:shadow-lg"
-                >
-                  Request Work
-                </button>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

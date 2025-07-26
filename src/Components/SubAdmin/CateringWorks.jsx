@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { getCateringWorkList, getAssignedUsers, submitAttendanceRating, getBoyRating, updateBoyRating, submitBoyWage, submitSubAdminSupervisorWage, updateSubAdminSupervisorWage, addExtraExpense } from '../../Services/Api/SubAdmin/SubLoginSlice';
+import { getCateringWorkList, getAssignedUsers, submitAttendanceRating, getBoyRating, updateBoyRating, submitBoyWage, submitSubAdminSupervisorWage, updateSubAdminSupervisorWage, addExtraExpense, getTotalWages, updateWorkStatus, getBoyWage, getSubAdminSupervisorWage } from '../../Services/Api/SubAdmin/SubLoginSlice';
 import { Search, Filter, Calendar, MapPin, User, Phone, Eye, AlertCircle, RefreshCw, Users, Clock, ExternalLink, Star, StarOff, CheckCircle, X } from 'lucide-react';
 
 const CateringWorks = () => {
   const dispatch = useDispatch();
-  const { cateringWorkList, assignedUsers, attendanceRating, boyWage, boyRating } = useSelector((state) => state.subAdminAuth);
+  const { cateringWorkList, assignedUsers, attendanceRating, boyWage, boyRating, totalWages, workStatusUpdate, boyWageData, subAdminWageData } = useSelector((state) => state.subAdminAuth);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -27,6 +27,10 @@ const CateringWorks = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [selectedWorkForExpense, setSelectedWorkForExpense] = useState(null);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [selectedWorkForStatus, setSelectedWorkForStatus] = useState(null);
+  const [showTotalWagesModal, setShowTotalWagesModal] = useState(false);
+  const [selectedWorkForTotalWages, setSelectedWorkForTotalWages] = useState(null);
 
   // REMOVED DUPLICATE boyRating DECLARATION AND FIXED ratingData STATE
   const [ratingData, setRatingData] = useState({
@@ -54,6 +58,26 @@ const handleRefresh = () => {
   dispatch(getCateringWorkList('upcoming'));
   dispatch(getCateringWorkList('past'));
 };
+
+// Handle wage submission success
+useEffect(() => {
+  if (boyWage.success) {
+    // Show success message or notification
+    setTimeout(() => {
+      dispatch({ type: 'subAdminAuth/clearBoyWageState' });
+    }, 2000);
+  }
+}, [boyWage.success, dispatch]);
+
+// Handle rating submission success
+useEffect(() => {
+  if (attendanceRating.success) {
+    // Show success message or notification
+    setTimeout(() => {
+      dispatch({ type: 'subAdminAuth/clearAttendanceRatingState' });
+    }, 2000);
+  }
+}, [attendanceRating.success, dispatch]);
 
 const currentWorkList = activeTab === 'upcoming' 
   ? (cateringWorkList.upcoming?.data || []) 
@@ -348,6 +372,9 @@ const WageFormModal = ({
   initialData = {},
   isEditMode = false 
 }) => {
+  const { boyWageData, subAdminWageData } = useSelector((state) => state.subAdminAuth);
+  const dispatch = useDispatch();
+  
   const [wageData, setWageData] = useState({
     rating_amount: initialData.rating_amount || '',
     travel_allowance: initialData.travel_allowance || '',
@@ -358,6 +385,51 @@ const WageFormModal = ({
     extra_setting: initialData.extra_setting || '',
     payment_status: initialData.payment_status || 'not_paid'
   });
+
+  // Load existing wage data when editing
+  useEffect(() => {
+    if (isEditMode && user.wage_id) {
+      if (user.type === 'boys') {
+        dispatch(getBoyWage(user.wage_id));
+      } else {
+        dispatch(getSubAdminSupervisorWage(user.wage_id));
+      }
+    }
+  }, [isEditMode, user.wage_id, user.type, dispatch]);
+
+  // Update form when wage data is loaded
+  useEffect(() => {
+    if (isEditMode && user.type === 'boys' && boyWageData.data && !boyWageData.isLoading) {
+      const wage = boyWageData.data;
+      setWageData({
+        rating_amount: wage.rating_amount || '',
+        travel_allowance: wage.travel_allowance || '',
+        over_time: wage.over_time || '',
+        long_fare: wage.long_fare || '',
+        bonus: wage.bonus || '',
+        extra_loading: wage.extra_loading || '',
+        extra_setting: wage.extra_setting || '',
+        payment_status: wage.payment_status || 'not_paid'
+      });
+    }
+  }, [isEditMode, user.type, boyWageData.data, boyWageData.isLoading]);
+
+  // Update form when subadmin/supervisor wage data is loaded
+  useEffect(() => {
+    if (isEditMode && user.type !== 'boys' && subAdminWageData.data && !subAdminWageData.isLoading) {
+      const wage = subAdminWageData.data;
+      setWageData({
+        rating_amount: wage.rating_amount || '',
+        travel_allowance: wage.travel_allowance || '',
+        over_time: wage.over_time || '',
+        long_fare: wage.long_fare || '',
+        bonus: wage.bonus || '',
+        extra_loading: wage.extra_loading || '',
+        extra_setting: wage.extra_setting || '',
+        payment_status: wage.payment_status || 'not_paid'
+      });
+    }
+  }, [isEditMode, user.type, subAdminWageData.data, subAdminWageData.isLoading]);
 
   const handleSubmit = () => {
     const submitData = {
@@ -374,6 +446,9 @@ const WageFormModal = ({
     };
     onSubmit(submitData);
   };
+
+  const isLoading = (user.type === 'boys' && boyWageData.isLoading) || 
+                   (user.type !== 'boys' && subAdminWageData.isLoading);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50">
@@ -393,6 +468,14 @@ const WageFormModal = ({
         </div>
         
         <div className="p-4 space-y-6 pb-40">
+          {/* Loading state for editing */}
+          {isEditMode && isLoading && (
+            <div className="text-center py-4">
+              <RefreshCw className="h-5 w-5 animate-spin mx-auto text-blue-500" />
+              <p className="text-sm text-gray-600 mt-2">Loading wage data...</p>
+            </div>
+          )}
+
           {/* Wage Section */}
           <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
             <h4 className="text-lg font-semibold text-blue-900 mb-4">Wage Details</h4>
@@ -500,7 +583,8 @@ const WageFormModal = ({
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 space-y-3">
           <button
             onClick={handleSubmit}
-            className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-base"
+            disabled={isEditMode && isLoading}
+            className="w-full bg-blue-600 text-white py-4 px-4 rounded-xl font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-base disabled:opacity-50"
           >
             {isEditMode ? 'Update Wage' : 'Submit Wage'}
           </button>
@@ -510,6 +594,153 @@ const WageFormModal = ({
             className="w-full bg-gray-100 text-gray-700 py-4 px-4 rounded-xl font-medium hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-base"
           >
             Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+// Status Update Modal - Updated for completion confirmation
+const StatusUpdateModal = ({ work, onClose, onSubmit }) => {
+  const handleSubmit = () => {
+    onSubmit('completed');
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50">
+      <div className="bg-white rounded-t-2xl w-full max-h-[90vh] overflow-y-auto animate-slide-up">
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">Mark Work as Completed</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+        
+        <div className="p-4 space-y-6 pb-40">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-medium text-gray-900 mb-2">{work.Auditorium_name}</h4>
+            <p className="text-sm text-gray-600">{work.place}, {work.district}</p>
+            <p className="text-sm text-gray-600">{formatDate(work.date)}</p>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <AlertCircle className="h-5 w-5 text-yellow-400 mt-0.5 mr-3 flex-shrink-0" />
+              <div>
+                <h4 className="text-sm font-medium text-yellow-800">Confirm Completion</h4>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Are you sure you want to mark this work as completed? This action cannot be undone and you won't be able to add or edit wages after completion.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 space-y-3">
+          <button
+            onClick={handleSubmit}
+            className="w-full bg-green-600 text-white py-4 px-4 rounded-xl font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 text-base"
+          >
+            Mark as Completed
+          </button>
+          
+          <button
+            onClick={onClose}
+            className="w-full bg-gray-100 text-gray-700 py-4 px-4 rounded-xl font-medium hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-base"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Total Wages Modal
+// Total Wages Modal - Fixed to prevent repeated API calls
+const TotalWagesModal = ({ work, onClose }) => {
+  const { totalWages } = useSelector((state) => state.subAdminAuth);
+  const dispatch = useDispatch();
+  const [dataLoaded, setDataLoaded] = useState(false);
+  
+  useEffect(() => {
+    // Only fetch if we don't have data for this work and haven't loaded it yet
+    if (!totalWages.data[work.id] && !dataLoaded && !totalWages.isLoading) {
+      dispatch(getTotalWages(work.id));
+      setDataLoaded(true);
+    }
+  }, [dispatch, work.id, totalWages.data, dataLoaded, totalWages.isLoading]);
+
+  const currentWageData = totalWages.data[work.id];
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50">
+      <div className="bg-white rounded-t-2xl w-full max-h-[90vh] overflow-y-auto animate-slide-up">
+        <div className="sticky top-0 bg-white border-b border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">Total Wages</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+        
+        <div className="p-4 space-y-6">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-medium text-gray-900 mb-2">{work.Auditorium_name}</h4>
+            <p className="text-sm text-gray-600">{work.place}, {work.district}</p>
+            <p className="text-sm text-gray-600">{formatDate(work.date)}</p>
+          </div>
+
+          {totalWages.isLoading ? (
+            <div className="text-center py-8">
+              <RefreshCw className="h-5 w-5 animate-spin mx-auto text-blue-500" />
+              <p className="text-sm text-gray-600 mt-2">Loading wage data...</p>
+            </div>
+          ) : currentWageData ? (
+            <div className="space-y-4">
+              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                <h4 className="text-lg font-semibold text-blue-900 mb-4">Wage Breakdown</h4>
+                <div className="space-y-3">
+                  {Object.entries(currentWageData.total_paid_wages).map(([role, amount]) => (
+                    <div key={role} className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-700 capitalize">
+                        {role.replace('_', ' ')}
+                      </span>
+                      <span className="text-sm font-bold text-gray-900">₹{amount}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-semibold text-green-900">Total Amount</span>
+                  <span className="text-xl font-bold text-green-900">₹{currentWageData.total_amount}</span>
+                </div>
+              </div>
+            </div>
+          ) : totalWages.error ? (
+            <div className="text-center py-8 text-red-500">
+              <p>Error loading wage data: {totalWages.error}</p>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <p>No wage data available for this work.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
+          <button
+            onClick={onClose}
+            className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+          >
+            Close
           </button>
         </div>
       </div>
@@ -779,9 +1010,24 @@ const ExpenseModal = ({
             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getWorkTypeColor(work.work_type)}`}>
               {formatWorkType(work.work_type)}
             </span>
-            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getStatusColor(work.status)}`}>
-              {work.status ? work.status.charAt(0).toUpperCase() + work.status.slice(1) : 'Unknown'}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getStatusColor(work.status)}`}>
+                {work.status ? work.status.charAt(0).toUpperCase() + work.status.slice(1) : 'Unknown'}
+              </span>
+              {work.status !== 'completed' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedWorkForStatus(work);
+                    setShowStatusModal(true);
+                  }}
+                  className="p-1 text-gray-500 hover:text-green-600 rounded"
+                  title="Mark as Complete"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Clickable Card Content */}
@@ -836,32 +1082,50 @@ const ExpenseModal = ({
               setShowAssignedUsersModal(true);
               dispatch(getAssignedUsers(work.id));
             }}
-            className="w-full bg-blue-50 hover:bg-blue-100 rounded-lg p-3 mb-3 transition-colors"
-          >
-            <div className="flex items-center justify-center">
-              <Users className="h-5 w-5 text-blue-600 mr-2" />
-              <span className="text-base font-bold text-blue-900">{work.no_of_boys_needed || 0} Boys Needed</span>
-            </div>
-          </button>
+            className="w-full bg-blue-50hover:bg-blue-100 rounded-lg p-3 mb-3 transition-colors"
+         >
+           <div className="flex items-center justify-center">
+             <Users className="h-5 w-5 text-blue-600 mr-2" />
+             <span className="text-base font-bold text-blue-900">{work.no_of_boys_needed || 0} Boys Needed</span>
+           </div>
+         </button>
 
-          {/* Work Expenses Button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedWorkForExpense(work);
-              setShowExpenseModal(true);
-            }}
-            className="w-full bg-green-50 hover:bg-green-100 rounded-lg p-3 mb-4 transition-colors"
-          >
-            <div className="flex items-center justify-center">
-              <div className="h-5 w-5 text-green-600 mr-2">₹</div>
-              <span className="text-base font-bold text-green-900">Work Expenses</span>
-            </div>
-          </button>
-        </div>
-      ))
-    )}
-  </div>
+         {/* Action Buttons Row */}
+         <div className="grid grid-cols-2 gap-3">
+           {/* Total Wages Button */}
+           <button
+             onClick={(e) => {
+               e.stopPropagation();
+               setSelectedWorkForTotalWages(work);
+               setShowTotalWagesModal(true);
+             }}
+             className="bg-purple-50 hover:bg-purple-100 rounded-lg p-3 transition-colors"
+           >
+             <div className="flex items-center justify-center">
+               <div className="h-5 w-5 text-purple-600 mr-2">₹</div>
+               <span className="text-sm font-bold text-purple-900">Total Cost</span>
+             </div>
+           </button>
+
+           {/* Work Expenses Button */}
+           <button
+             onClick={(e) => {
+               e.stopPropagation();
+               setSelectedWorkForExpense(work);
+               setShowExpenseModal(true);
+             }}
+             className="bg-green-50 hover:bg-green-100 rounded-lg p-3 transition-colors"
+           >
+             <div className="flex items-center justify-center">
+               <div className="h-5 w-5 text-green-600 mr-2">₹</div>
+               <span className="text-sm font-bold text-green-900">Expenses</span>
+             </div>
+           </button>
+         </div>
+       </div>
+     ))
+   )}
+ </div>
 )}
 
 {/* Updated Detail Modal */}
@@ -1083,26 +1347,23 @@ const ExpenseModal = ({
               </div>
               
               <div className="flex gap-2">
-                {/* Rate Button - Only for boys */}
-                {user.type === 'boys' && (
-                  <button
-                    onClick={() => {
-                      setSelectedUserForRating(user);
-                      setShowRatingModal(true);
-                      setIsEditMode(!!user.is_rated);
-                      setEditingRatingId(user.is_rated || null);
-                      if (user.is_rated) {
-                        dispatch(getBoyRating(user.is_rated));
-                      }
-                    }}
-                    className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
-                  >
-                    {user.is_rated ? 'Edit Rating' : 'Rate User'}
-                  </button>
-                )}
+                <button
+                  onClick={() => {
+                    setSelectedUserForRating(user);
+                    setShowRatingModal(true);
+                    setIsEditMode(!!user.is_rated);
+                    setEditingRatingId(user.is_rated || null);
+                    if (user.is_rated && user.is_rated !== true) {
+                      dispatch(getBoyRating(user.is_rated));
+                    }
+                  }}
+                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
+                >
+                  {user.is_rated ? 'Edit Rating' : 'Rate User'}
+                </button>
                 
-                {/* Wage Button - For everyone, but boys need rating first */}
-                {(user.type !== 'boys' || user.is_rated) && (
+                {/* Wage Button - For everyone, but they need rating first. Disabled if work is completed */}
+                {user.is_rated && selectedWorkForUsers.status !== 'completed' && (
                   <button
                     onClick={() => {
                       setSelectedUserForWage(user);
@@ -1110,10 +1371,24 @@ const ExpenseModal = ({
                       setIsWageEditMode(!!user.wage_id);
                       setEditingWageId(user.wage_id || null);
                     }}
-                    className={`${user.type === 'boys' ? 'flex-1' : 'w-full'} bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700`}
+                    className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700"
                   >
                     {user.wage_id ? 'Edit Wage' : 'Add Wage'}
                   </button>
+                )}
+                
+                {/* Show message if rating is required */}
+                {!user.is_rated && (
+                  <div className="flex-1 bg-gray-100 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium text-center">
+                    Rate First
+                  </div>
+                )}
+                
+                {/* Show completed status if work is completed */}
+                {selectedWorkForUsers.status === 'completed' && !user.wage_id && (
+                  <div className="flex-1 bg-gray-100 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium text-center">
+                    Work Completed
+                  </div>
                 )}
               </div>
             </div>
@@ -1125,7 +1400,8 @@ const ExpenseModal = ({
   </div>
 )}
 
-{/* FIXED Rating Modal */}
+
+{/* FIXED Rating Modal - Update the onSubmit logic */}
 {showRatingModal && selectedUserForRating && selectedWorkForUsers && (
   <RatingModal
     user={selectedUserForRating}
@@ -1137,13 +1413,19 @@ const ExpenseModal = ({
       setEditingRatingId(null);
     }}
     onSubmit={(ratingData) => {
-      if (isEditMode && editingRatingId) {
+      if (isEditMode && editingRatingId && editingRatingId !== true) {
         dispatch(updateBoyRating({ 
           ratingId: editingRatingId, 
           ratingData 
         }));
       } else {
-        dispatch(submitAttendanceRating(ratingData));
+        // For all users - boys, supervisors, subadmins
+        if (selectedUserForRating.type === 'boys') {
+          dispatch(submitAttendanceRating(ratingData));
+        } else {
+          // Use the same rating API for supervisors and subadmins
+          dispatch(submitAttendanceRating(ratingData));
+        }
       }
       setShowRatingModal(false);
       setSelectedUserForRating(null);
@@ -1157,7 +1439,9 @@ const ExpenseModal = ({
   />
 )}
 
-{/* FIXED Wage Modal */}
+
+
+{/* FIXED Wage Modal - Update the onSubmit logic */}
 {showWageModal && selectedUserForWage && selectedWorkForUsers && (
   <WageFormModal
     user={selectedUserForWage}
@@ -1170,32 +1454,60 @@ const ExpenseModal = ({
     }}
     onSubmit={(wageData) => {
       if (selectedUserForWage.type === 'boys') {
-        // Use existing boy wage API
+        // For boys - use existing boy wage API
         if (isWageEditMode && editingWageId) {
-          dispatch(submitBoyWage({ 
-            wageId: editingWageId, 
-            wageData 
-          }));
+          // Edit existing boy wage
+          dispatch(submitBoyWage({
+            ...wageData,
+            wage_id: editingWageId
+          })).then((result) => {
+            if (result.type === 'subAdminAuth/submitBoyWage/fulfilled') {
+              setShowWageModal(false);
+              setSelectedUserForWage(null);
+              setIsWageEditMode(false);
+              setEditingWageId(null);
+              dispatch(getAssignedUsers(selectedWorkForUsers.id));
+            }
+          });
         } else {
-          dispatch(submitBoyWage(wageData));
+          // Create new boy wage
+          dispatch(submitBoyWage(wageData)).then((result) => {
+            if (result.type === 'subAdminAuth/submitBoyWage/fulfilled') {
+              setShowWageModal(false);
+              setSelectedUserForWage(null);
+              setIsWageEditMode(false);
+              setEditingWageId(null);
+              dispatch(getAssignedUsers(selectedWorkForUsers.id));
+            }
+          });
         }
       } else {
-        // Use new API for subadmin/supervisor wage
+        // For subadmin/supervisor - use API for subadmin/supervisor wage
         if (isWageEditMode && editingWageId) {
           dispatch(updateSubAdminSupervisorWage({ 
             wageId: editingWageId, 
             wageData 
-          }));
+          })).then((result) => {
+            if (result.type === 'subAdminAuth/updateSubAdminSupervisorWage/fulfilled') {
+              setShowWageModal(false);
+              setSelectedUserForWage(null);
+              setIsWageEditMode(false);
+              setEditingWageId(null);
+              dispatch(getAssignedUsers(selectedWorkForUsers.id));
+            }
+          });
         } else {
-          dispatch(submitSubAdminSupervisorWage(wageData));
+          dispatch(submitSubAdminSupervisorWage(wageData)).then((result) => {
+            if (result.type === 'subAdminAuth/submitSubAdminSupervisorWage/fulfilled') {
+              setShowWageModal(false);
+              setSelectedUserForWage(null);
+              setIsWageEditMode(false);
+              setEditingWageId(null);
+              dispatch(getAssignedUsers(selectedWorkForUsers.id));
+            }
+          });
         }
       }
-      setShowWageModal(false);
-      setSelectedUserForWage(null);
-      setIsWageEditMode(false);
-      setEditingWageId(null);
-      // Refresh assigned users data
-      dispatch(getAssignedUsers(selectedWorkForUsers.id));
     }}
     initialData={isWageEditMode ? {} : {}}
     isEditMode={isWageEditMode}
@@ -1218,6 +1530,40 @@ const ExpenseModal = ({
     initialData={{}}
   />
 )}
+
+{/* Status Update Modal */}
+{showStatusModal && selectedWorkForStatus && (
+  <StatusUpdateModal
+    work={selectedWorkForStatus}
+    onClose={() => {
+      setShowStatusModal(false);
+      setSelectedWorkForStatus(null);
+    }}
+    onSubmit={(status) => {
+      dispatch(updateWorkStatus({ workId: selectedWorkForStatus.id, status })).then((result) => {
+        if (result.type === 'subAdminAuth/updateWorkStatus/fulfilled') {
+          setShowStatusModal(false);
+          setSelectedWorkForStatus(null);
+          // Refresh work lists
+          dispatch(getCateringWorkList('upcoming'));
+          dispatch(getCateringWorkList('past'));
+        }
+      });
+    }}
+  />
+)}
+
+{/* Total Wages Modal */}
+{showTotalWagesModal && selectedWorkForTotalWages && (
+  <TotalWagesModal
+    work={selectedWorkForTotalWages}
+    onClose={() => {
+      setShowTotalWagesModal(false);
+      setSelectedWorkForTotalWages(null);
+    }}
+  />
+)}
+
     </div>
   );
 };

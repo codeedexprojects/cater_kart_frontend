@@ -27,7 +27,7 @@ const [formData, setFormData] = useState({
   mobile_number: '',
   role: '',
   password: '',
-  confirmPassword: '',
+  plain_password: '',
   address: '',
   district: '',
   place: '',
@@ -86,7 +86,7 @@ useEffect(() => {
       mobile_number: userDetails.mobile_number || '',
       role: userDetails.role || '',
       password: '',
-      confirmPassword: '',
+      plain_password: '',
       address: userDetails.address || '',
       district: userDetails.district || '',
       place: userDetails.place || '',
@@ -255,8 +255,8 @@ const handleInputChange = (e) => {
   }
   
   // Only check password confirmation if password is provided
-  if (formData.password && formData.password !== formData.confirmPassword) {
-    errors.confirmPassword = 'Passwords do not match';
+  if (formData.password && formData.password !== formData.plain_password) {
+    errors.plain_password = 'Passwords do not match';
   }
   
   // For create mode, password is required
@@ -290,7 +290,7 @@ const handleInputChange = (e) => {
   
   try {
     // First create the user with basic details
-    const { confirmPassword, address, district, place, experienced, employment_type, has_bike, has_license, license_image, ...basicUserData } = formData;
+    const { plain_password, address, district, place, experienced, employment_type, has_bike, has_license, license_image, ...basicUserData } = formData;
     const createResult = await dispatch(createUser(basicUserData)).unwrap();
     const newUserId = createResult.user.id;
     console.log(createResult.user.id) // Assuming the API returns the new user ID
@@ -314,7 +314,7 @@ const handleInputChange = (e) => {
     
     // Reset form and close modal
     setFormData({
-      user_name: '', mobile_number: '', role: '', password: '', confirmPassword: '',
+      user_name: '', mobile_number: '', role: '', password: '', plain_password: '',
       address: '', district: '', place: '', experienced: false, employment_type: '',
       has_bike: false, has_license: false, license_image: null
     });
@@ -341,7 +341,7 @@ const handleInputChange = (e) => {
       mobile_number: '',
       role: '',
       password: '',
-      confirmPassword: ''
+      plain_password: ''
     });
     setFormErrors({});
     dispatch(clearCreateError());
@@ -449,7 +449,7 @@ const handleEditSubmit = async (e) => {
   }
   
   try {
-    const { confirmPassword, address, district, place, experienced, employment_type, has_bike, has_license, license_image, ...allBasicData } = formData;
+    const { plain_password, address, district, place, experienced, employment_type, has_bike, has_license, license_image, ...allBasicData } = formData;
     
     // Get only changed basic user fields
     const changedBasicData = getChangedFields(originalUserData, allBasicData, ['password']);
@@ -495,7 +495,7 @@ const handleEditSubmit = async (e) => {
     }
     
     setFormData({
-      user_name: '', mobile_number: '', role: '', password: '', confirmPassword: '',
+      user_name: '', mobile_number: '', role: '', password: '', plain_password: '',
       address: '', district: '', place: '', experienced: false, employment_type: '',
       has_bike: false, has_license: false, license_image: null
     });
@@ -516,7 +516,7 @@ const handleCloseEditModal = () => {
   setSelectedUserForEdit(null);
   setOriginalUserData(null); 
   setFormData({
-    user_name: '', mobile_number: '', role: '', password: '', confirmPassword: '',
+    user_name: '', mobile_number: '', role: '', password: '', plain_password: '',
     address: '', district: '', place: '', experienced: false, employment_type: '',
     has_bike: false, has_license: false, license_image: null
   });
@@ -728,6 +728,7 @@ const handleCloseEditModal = () => {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User Id</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Password</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mobile</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -746,6 +747,9 @@ const handleCloseEditModal = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {user.user_id}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {user.plain_password}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {user.mobile_number || 'N/A'}
@@ -905,17 +909,17 @@ const handleCloseEditModal = () => {
                   </label>
                   <input
                     type="password"
-                    name="confirmPassword"
-                    value={formData.confirmPassword}
+                    name="plain_password"
+                    value={formData.plain_password}
                     onChange={handleInputChange}
                     className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      formErrors.confirmPassword ? 'border-red-500' : 'border-gray-300'
+                      formErrors.plain_password ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="Confirm password"
                     disabled={isCreating}
                   />
-                  {formErrors.confirmPassword && (
-                    <p className="mt-1 text-sm text-red-600">{formErrors.confirmPassword}</p>
+                  {formErrors.plain_password && (
+                    <p className="mt-1 text-sm text-red-600">{formErrors.plain_password}</p>
                   )}
                 </div>
 
@@ -1085,6 +1089,10 @@ const handleCloseEditModal = () => {
                     <p className="text-sm text-gray-900">{userDetails.user_id}</p>
                   </div>
                   <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <p className="text-sm text-gray-900">{userDetails.plain_password}</p>
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
                     <p className="text-sm text-gray-900">{userDetails.mobile_number || 'N/A'}</p>
                   </div>
@@ -1232,48 +1240,6 @@ const handleCloseEditModal = () => {
               <p className="mt-1 text-sm text-red-600">{formErrors.role}</p>
             )}
           </div>
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password (leave blank to keep current)
-            </label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                formErrors.password ? 'border-red-500' : 'border-gray-300'
-              }`}
-              placeholder="Enter new password"
-              disabled={isUpdating}
-            />
-            {formErrors.password && (
-              <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>
-            )}
-          </div>
-
-          {formData.password && (
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm Password *
-              </label>
-              <input
-                type="password"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  formErrors.confirmPassword ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="Confirm password"
-                disabled={isUpdating}
-              />
-              {formErrors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-600">{formErrors.confirmPassword}</p>
-              )}
-            </div>
-          )}
 
           {/* Add these fields in the Edit Modal after the role field */}
 <div className="mb-4">

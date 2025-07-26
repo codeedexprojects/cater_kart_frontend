@@ -1261,39 +1261,39 @@ const handleAssignByRole = async (roleType) => {
                   <td className="px-6 py-4">
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        {request.boy?.user_name || 'N/A'}
+                        {request.boy_name || 'N/A'}
                       </div>
                       <div className="text-sm text-gray-500 flex items-center gap-1">
                         <Phone className="h-3 w-3" />
-                        {request.boy?.mobile_number || 'N/A'}
+                        {request.boy_mobile || 'N/A'}
                       </div>
                       <div className="text-sm text-gray-500 flex items-center gap-1">
                         <MapPin className="h-3 w-3" />
-                        {request.boy?.place}, {request.boy?.district}
+                        {request.boy_place}, {request.boy?.district}
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1">
-                      {request.boy?.experienced && (
+                      {request.boy_experience && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Experienced
                         </span>
                       )}
-                      {request.boy?.has_bike && (
+                      {request.boy_bike && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                           <Bike className="h-3 w-3 mr-1" />
                           Has Bike
                         </span>
                       )}
-                      {request.boy?.has_license && (
+                      {request.boy_license && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
                           <CreditCard className="h-3 w-3 mr-1" />
                           Licensed
                         </span>
                       )}
-                      {!request.boy?.experienced && !request.boy?.has_bike && !request.boy?.has_license && (
+                      {!request.boy_experience && !request.boy_bike && !request.boy_license && (
                         <span className="text-xs text-gray-500">No special skills listed</span>
                       )}
                     </div>
