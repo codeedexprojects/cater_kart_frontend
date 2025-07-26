@@ -30,7 +30,7 @@ import {
   deleteWork, 
   fetchWorkRequestsByWork,
   updateWorkRequestStatusAndAssign,
-  assignSupervisors,
+  deleteAssignedBoy,
   assignBoyToWork,
   publishWork,
   fetchAssignedUsers,
@@ -101,6 +101,7 @@ const {
   workRequests, 
   assignedUsers, 
   loading, 
+  admin,
   error,
   selectedWork,
   showDetailModal,
@@ -249,6 +250,28 @@ const handleWorkClick = async (work) => {
   } catch (error) {
     console.error('Failed to load work data:', error);
     showToast('Failed to load work data', 'error');
+  }
+};
+
+const handleRemoveAssignedUser = (userId, workId) => {
+  console.log('Handler called with:', { userId, workId });
+  
+  if (!userId || !workId) {
+    alert('Error: Missing user ID or work ID');
+    return;
+  }
+  
+  if (window.confirm('Are you sure you want to remove this user from the work assignment?')) {
+    dispatch(deleteAssignedBoy({ user_id: userId, work_id: workId }))
+      .unwrap()
+      .then(() => {
+        dispatch(fetchAssignedUsers(workId));
+        alert('User has been successfully removed from work assignment');
+      })
+      .catch((error) => {
+        console.error('Remove user error:', error);
+        alert(`Error removing user: ${error}`);
+      });
   }
 };
 
@@ -1165,6 +1188,9 @@ const handleAssignByRole = async (roleType) => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Assigned Date
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1191,7 +1217,7 @@ const handleAssignByRole = async (roleType) => {
                             ? 'bg-blue-100 text-blue-800' 
                             : 'bg-green-100 text-green-800'
                         }`}>
-                          {user.role === 'supervisor' || user.type === 'supervisor' ? 'Supervisor' : 'Boy'}
+                          {user.role}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -1208,6 +1234,16 @@ const handleAssignByRole = async (roleType) => {
                             minute: '2-digit'
                           })}
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => handleRemoveAssignedUser(user.user_id,selectedWork?.id)}
+                          className="inline-flex items-center px-3 py-1 rounded-md text-sm font-medium text-red-700 bg-red-100 hover:bg-red-200 border border-red-200 transition-colors"
+                          title="Remove user from this work"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Remove
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -1395,6 +1431,7 @@ const handleAssignByRole = async (roleType) => {
     </div>
   </div>
 )}
+
 
 {showBoyModal && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">

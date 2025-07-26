@@ -30,6 +30,7 @@ const CateringStaffJobDetails = () => {
   const isApplied = jobDetails?.join_requests && jobDetails.join_requests.length > 0;
 
   useEffect(() => {
+    console.log(jobDetails?.join_requests);
     // Clear previous work details when component mounts
     dispatch(clearCurrentWork());
     

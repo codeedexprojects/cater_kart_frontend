@@ -228,6 +228,52 @@ export const deleteWork = createAsyncThunk(
   }
 );
 
+
+
+export const deleteAssignedBoy = createAsyncThunk(
+  'work/deleteAssignedBoy',
+  async ({ user_id, work_id }, { rejectWithValue, getState, dispatch }) => {
+    try {
+      const { adminAuth } = getState();
+      
+      // Check if user is authenticated
+      if (!adminAuth.tokens?.access) {
+        return rejectWithValue('Not authenticated');
+      }
+      
+      // Debug: Log the parameters to ensure they're not undefined
+      console.log('Deleting user:', user_id, 'from work:', work_id);
+      
+      const response = await fetch(`${API_BASE_URL}/admin_panel/join-requests/delete/${user_id}/${work_id}/`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminAuth.tokens.access}`,
+        },
+      });
+      
+      // Handle 401 unauthorized errors
+      if (response.status === 401) {
+        dispatch({ type: 'adminAuth/logoutAdmin' });
+        return rejectWithValue('Session expired. Please login again.');
+      }
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `Failed to delete assigned user. Status: ${response.status}`);
+      }
+      
+      // Return the IDs for state updates
+      return { user_id, work_id };
+    } catch (error) {
+      console.error('Delete error:', error);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+
+
 export const fetchWorkRequestsByWork = createAsyncThunk(
   'work/fetchWorkRequests',
   async (id, { rejectWithValue, getState, dispatch }) => {
@@ -777,7 +823,49 @@ const workSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      
+      // Updated extraReducers section for deleteAssignedBoy
+      .addCase(deleteAssignedBoy.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteAssignedBoy.fulfilled, (state, action) => {
+        state.loading = false;
+        const { user_id, work_id } = action.payload;
+        
+        // Remove the user from assignedUsers if it matches the current work
+        if (state.assignedUsers && state.assignedUsers.users) {
+          state.assignedUsers.users = state.assignedUsers.users.filter(
+            user => user.id !== user_id
+          );
+        }
+        
+        // Also remove from assignedBoys if it exists
+        if (state.assignedBoys[work_id]) {
+          state.assignedBoys[work_id] = state.assignedBoys[work_id].filter(
+            boy => boy.id !== user_id
+          );
+        }
+        
+        // Update works array if needed
+        const workIndex = state.works.findIndex(work => work.id === work_id);
+        if (workIndex !== -1 && state.works[workIndex].assigned_boys) {
+          state.works[workIndex].assigned_boys = state.works[workIndex].assigned_boys.filter(
+            boy => boy.id !== user_id
+          );
+        }
+        
+        // Update upcomingWorks array if needed
+        const upcomingWorkIndex = state.upcomingWorks.findIndex(work => work.id === work_id);
+        if (upcomingWorkIndex !== -1 && state.upcomingWorks[upcomingWorkIndex].assigned_boys) {
+          state.upcomingWorks[upcomingWorkIndex].assigned_boys = state.upcomingWorks[upcomingWorkIndex].assigned_boys.filter(
+            boy => boy.id !== user_id
+          );
+        }
+      })
+      .addCase(deleteAssignedBoy.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
       // Fetch work requests
       .addCase(fetchWorkRequestsByWork.pending, (state) => {
         state.loading = true;
